@@ -1,4 +1,4 @@
-// The console's API, shared by the Node server (server/index.mjs) and the Cloudflare Worker (worker/).
+// The console's API, run by the Cloudflare Worker's Durable Object (worker/design-system.mjs).
 // Each route gets the request's JSON body. The server around it reads the body, decides who may call,
 // and sends the answer. Errors with a status (like 409 for "no changes to publish") go back as they are.
 //

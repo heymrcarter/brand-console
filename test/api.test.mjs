@@ -39,7 +39,7 @@ test("errors keep their status, like 409 when there is nothing to publish and 50
   const { api } = await setup();
   await api.call("POST", "/api/publish", { note: "The sample draft's changes." });
   await assert.rejects(api.call("POST", "/api/publish", { note: "x" }), (e) => e.status === 409 && /no changes/.test(e.message));
-  await assert.rejects(api.call("POST", "/api/ask", { turns: [] }), (e) => e.status === 503 && /\.env/.test(e.message));
+  await assert.rejects(api.call("POST", "/api/ask", { turns: [] }), (e) => e.status === 503 && /ANTHROPIC_API_KEY/.test(e.message));
   await assert.rejects(api.call("POST", "/api/flag", { version: "9.9.9" }), (e) => e.status === 404);
 });
 

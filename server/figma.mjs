@@ -1,5 +1,5 @@
 // Figma sync for the server. Talks to the Figma REST API with a personal access token.
-// The token is the FIGMA_TOKEN secret (in .env on this computer) and never goes to the browser.
+// The token is the FIGMA_TOKEN secret (kept in the Durable Object) and never goes to the browser.
 // The file link lives in figma.json. What both sides agreed on at the last sync lives in .figma-sync.json.
 // Files and secrets go through the storage and secrets interfaces (see server/storage/storage.mjs), never the disk.
 

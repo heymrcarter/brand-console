@@ -7,11 +7,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createStore } from "../server/store.mjs";
 import { createFigma, parseFigmaKey } from "../server/figma.mjs";
-import { createDiskStorage, createEnvSecrets } from "../server/storage/disk.mjs";
+import { createDiskStorage } from "../server/storage/disk.mjs";
+import { createMemorySecrets } from "../server/storage/memory.mjs";
 import { startFigmaMock } from "./figma-mock.mjs";
 
 const here = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-let root, store, figma, mock, E;
+let root, store, figma, mock, E, secrets;
 const KEY = "ABCDEFGHIJ1234", LINK = `https://www.figma.com/design/${KEY}/Brand-library?node-id=0-1`;
 
 before(async () => {
@@ -27,7 +28,8 @@ before(async () => {
   mock.addStyle("TEXT", "Heading/H1", { style: { fontFamily: "Inter", fontWeight: 700, fontSize: 32 } });
   const storage = createDiskStorage(root);
   store = createStore(storage); E = store.E;
-  figma = createFigma({ storage, secrets: createEnvSecrets(root), store, apiBase: mock.url });
+  secrets = createMemorySecrets();
+  figma = createFigma({ storage, secrets, store, apiBase: mock.url });
 });
 after(async () => { await mock.close(); fs.rmSync(root, { recursive: true, force: true }); });
 
@@ -40,11 +42,11 @@ test("reads Figma file links", () => {
   assert.equal(parseFigmaKey("not a link"), null);
 });
 
-test("connect explains a bad token, then saves a good one in .env", async () => {
+test("connect explains a bad token, then keeps a good one as a secret", async () => {
   await assert.rejects(figma.connect({ fileUrl: LINK, token: "wrong" }), /did not let the console/);
   const s = await figma.connect({ fileUrl: LINK, token: "test-token" });
   assert.equal(s.connected, true); assert.equal(s.fileName, "Brand library"); assert.equal(s.varsBlocked, false);
-  assert.match(fs.readFileSync(path.join(root, ".env"), "utf8"), /^FIGMA_TOKEN=test-token$/m);
+  assert.equal(await secrets.get("FIGMA_TOKEN"), "test-token");
 });
 
 test("first sync reads the existing file, keeps its values, and adds what is missing", async () => {

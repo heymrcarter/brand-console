@@ -6,7 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createDiskStorage, createEnvSecrets } from "../server/storage/disk.mjs";
+import { createDiskStorage } from "../server/storage/disk.mjs";
 import { createMemoryStorage, createMemorySecrets } from "../server/storage/memory.mjs";
 import { createGitHubStorage } from "../server/storage/github.mjs";
 import { createGitHubMock } from "./github-mock.mjs";
@@ -81,21 +81,7 @@ test("memory storage records each commit with the files it changed", async () =>
   assert.deepEqual(s.commits, [{ message: "first", files: ["dist/theme.css", "tokens/a.json"] }, { message: "second", files: ["dist/theme.css"] }]);
 });
 
-test("secrets: .env on this computer, with the environment as a fallback, and in memory for tests", async () => {
-  const dir = tmpDir();
-  fs.writeFileSync(path.join(dir, ".env"), "PORT=5173\nFIGMA_TOKEN = 'from-file'\n");
-  const env = createEnvSecrets(dir, { FIGMA_TOKEN: "from-env", OTHER: "only-env" });
-  assert.equal(await env.get("FIGMA_TOKEN"), "from-file");
-  assert.equal(await env.get("OTHER"), "only-env");
-  await env.set("FIGMA_TOKEN", "new");
-  assert.equal(fs.readFileSync(path.join(dir, ".env"), "utf8"), "PORT=5173\nFIGMA_TOKEN=new\n");
-  await env.set("FIGMA_TOKEN", "");
-  assert.equal(fs.readFileSync(path.join(dir, ".env"), "utf8"), "PORT=5173\n");
-  assert.equal(await env.get("FIGMA_TOKEN"), "from-env");
-  if (process.platform !== "win32") assert.equal(fs.statSync(path.join(dir, ".env")).mode & 0o777, 0o600);
-  await assert.rejects(env.get("FIGMA_TOKEN.*"), /not a valid secret name/);
-  fs.rmSync(dir, { recursive: true, force: true });
-
+test("secrets in memory, for tests", async () => {
   const mem = createMemorySecrets({ FIGMA_TOKEN: "t" });
   assert.equal(await mem.get("FIGMA_TOKEN"), "t");
   await mem.set("FIGMA_TOKEN", "");

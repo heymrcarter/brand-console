@@ -91,6 +91,10 @@ The free plan gives a Worker 10 ms of CPU time per request, and allows 100,000 r
 
 This is for trying changes. It never deploys.
 
+`npm start` runs the real Worker in `wrangler dev` against a stand-in for GitHub that holds this project's design system, with Storybook next to it. It needs no accounts and no settings, and everything you do disappears when you stop it.
+
+To run against a real GitHub repository instead:
+
 ```sh
 cp .dev.vars.example .dev.vars   # then fill in GITHUB_TOKEN or the GitHub App settings
 npm run worker:dev

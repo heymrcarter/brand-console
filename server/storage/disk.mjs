@@ -1,5 +1,6 @@
-// Storage on this computer: the files live in the project folder, and each publish becomes a Git commit
-// when the project uses Git (see "Keep a history in Git" in the README). See storage.mjs for the interface.
+// Storage on this computer: the files live in the project folder. The build and the token scripts use it, and so does
+// the stand-in for GitHub (scripts/fake-github.mjs) to load the design system. commit() makes a Git commit when the
+// folder uses Git. See storage.mjs for the interface.
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
@@ -36,28 +37,6 @@ export function createDiskStorage(root) {
       // git add stops if any path is missing, so only name the ones this project has. A project with no uploaded fonts has no fonts folder.
       const paths = COMMITTED.filter((p) => fs.existsSync(path.join(root, p)));
       try { await run("git", ["add", ...paths], { cwd: root }); await run("git", ["commit", "-m", message], { cwd: root }); } catch { /* Nothing to commit, or Git is not set up. */ }
-    },
-  };
-}
-
-// Secrets on this computer live in the project's .env file, which Git ignores. A secret set in the environment
-// is used when .env does not have it.
-export function createEnvSecrets(root, env = process.env) {
-  const file = path.join(root, ".env");
-  const lines = () => (fs.existsSync(file) ? fs.readFileSync(file, "utf8").split(/\r?\n/) : []);
-  const named = (name) => { if (!/^[A-Z_][A-Z0-9_]*$/.test(name)) throw new Error(`That is not a valid secret name: ${name}`); return new RegExp(`^\\s*${name}\\s*=`); };
-  return {
-    async get(name) {
-      const re = named(name);
-      return (lines().find((l) => re.test(l)) || "").replace(new RegExp(re.source + "\\s*"), "").replace(/^["']|["']$/g, "").trim() || env[name] || "";
-    },
-    async set(name, value) {
-      const re = named(name);
-      const out = lines().filter((l) => !re.test(l));
-      while (out.length && out[out.length - 1] === "") out.pop();
-      if (value) out.push(`${name}=${value}`);
-      fs.writeFileSync(file, out.join("\n") + "\n", { mode: 0o600 });
-      try { fs.chmodSync(file, 0o600); } catch { /* Some file systems do not allow this. */ }
     },
   };
 }

@@ -1,13 +1,11 @@
 # Brand Console — Phase 1
 
-This is a working version of the design system console for Northfield and Crestline.
-It runs on your own computer. Nothing is sent anywhere except questions to Claude,
-and only if you add a Claude API key.
+This is the design system console for Northfield and Crestline. The team uses it online, on Cloudflare, behind the company's sign-in (see `docs/cloudflare.md`). This README is mostly for working on the console itself.
 
 It has three parts that work together:
 
-1. **The Brand Console** at http://127.0.0.1:5173. This is where the brand team changes colors, fonts, and component settings, checks them, and publishes new versions.
-2. **Storybook** at http://127.0.0.1:6006. This shows the real React components that engineers use. It updates a moment after you change something in the console. The **Guide** pages at the top (Start here, Foundations, and Contributing) explain the basics in plain words for every team. To make a copy you can put on a shared drive or web server, run `npm run docs:build`. It writes Storybook, with the Guide pages, to `storybook-static/`.
+1. **The Brand Console.** This is where the brand team changes colors, fonts, and component settings, checks them, and publishes new versions. Each publish is a commit to the design system's GitHub repository.
+2. **Storybook.** This shows the real React components that engineers use. The **Guide** pages at the top (Start here, Foundations, and Contributing) explain the basics in plain words for every team. To make a copy you can put on a shared drive or web server, run `npm run docs:build`. It writes Storybook, with the Guide pages, to `storybook-static/`.
 3. **The design token files** in the `tokens` folder. These are the source of truth. They use the W3C design token format.
 
 ---
@@ -18,45 +16,31 @@ It has three parts that work together:
   To check, open a terminal and type `node -v`. You should see a number like `v22.12.0` or `v24.11.0`. The console and Storybook still start on version 20.19, but the tests need 22.12 or newer, and version 20 stopped getting security fixes in April 2026.
 - A web browser. Chrome, Edge, or Safari work best, because they can turn your voice into text.
 
-## Start it the easy way (Mac)
+## Run it on your computer
 
-1. Unzip the folder somewhere easy to find, like your Documents folder.
-2. Double-click **Start Brand Console.command**.
-   The first time, your Mac may say it cannot check the file. If it does, right-click the file, pick **Open**, and then click **Open** again.
-3. The first time, it sets things up for a minute or two. Then the console opens in your browser.
-   When the project gets new parts, like a new tool for Storybook, it sets those up on its own the next time you start it.
-
-Keep the Terminal window open while you work. The links only work while it is running.
-
-## Start it from a terminal
-
-1. Unzip the folder somewhere easy to find, like your Documents folder.
-2. Open a terminal in that folder.
-   - **Mac:** Open Terminal, type `cd ` (with a space), drag the folder into the window, and press Return.
-   - **Windows:** Open the folder, click the address bar, type `cmd`, and press Enter.
-3. Type this and press Enter. It downloads what the project needs. It takes a minute or two, and you only do it once.
+1. Open a terminal in the project folder.
+2. Type this and press Enter. It downloads what the project needs. It takes a minute or two, and you only do it once.
    ```
    npm install
    ```
-4. Type this and press Enter:
+3. Type this and press Enter:
    ```
    npm start
    ```
-5. The console opens in your browser. The window also prints the links. If another program on your computer already uses the usual port, the console picks a free one and shows its link.
-   Storybook runs at **http://127.0.0.1:6006**. It takes about 20 seconds to start the first time.
+4. The console opens in your browser at **http://127.0.0.1:5173**, and Storybook runs at **http://127.0.0.1:6006**. Storybook takes about 20 seconds to start the first time. If another program already uses one of those ports, the console picks a free one and prints its link.
+
+This runs the real Worker, the same code as on Cloudflare, in `wrangler dev`. It runs against a stand-in for GitHub that holds this project's design system, so you need no GitHub account, no Cloudflare account, and no internet. You can save, publish, and roll back as much as you like. It all disappears when you stop, and the next `npm start` begins again from the files in this folder. Storybook follows your edits: a moment after each change, the draft's theme files are copied into `build/draft/`.
 
 To stop everything, go back to the terminal and press **Ctrl + C**.
+
+To run against a real GitHub repository instead, copy `.dev.vars.example` to `.dev.vars`, fill it in, and run `npm run worker:dev`.
 
 ## Connect the design guide to Claude (optional)
 
 Without a key, the guide gives sample answers. Everything else works the same.
 
-1. Make a copy of the file `.env.example` and name the copy `.env`.
-   (On a Mac, files that start with a dot are hidden. Press Command + Shift + period in Finder to show them.)
-2. Open `.env` in a text editor. After `ANTHROPIC_API_KEY=`, paste your key from https://console.anthropic.com.
-3. Stop the console with Ctrl + C, then run `npm start` again.
-
-Keep `.env` private. It is never saved into the project history.
+- **Online:** add the `ANTHROPIC_API_KEY` secret to the repository (see `docs/cloudflare.md`). The next deploy sends it to Cloudflare.
+- **On your computer:** start with the key in the environment: `ANTHROPIC_API_KEY=your-key npm start`. Get a key at https://console.anthropic.com. Never save it in a file in this project.
 
 ## Connect Figma (optional)
 
@@ -64,7 +48,7 @@ The console and your Figma library can send changes to each other. Either side c
 
 1. In Figma, open your library file. Pick **Share**, then **Copy link**.
 2. In Figma, make an access token. Open the menu at the top left, then **Settings**, then the **Security** tab. Under **Personal access tokens**, pick **Generate new token**. Give it access to **File content: read** and **Variables: read and write**.
-3. In the console, open **Sync with Figma** at the bottom of the left column. Paste the link and the token, then click **Connect to Figma**. The token is saved in `.env` on this computer only.
+3. In the console, open **Sync with Figma** at the bottom of the left column. Paste the link and the token, then click **Connect to Figma**. The console keeps the token on its server and never sends it to anyone's browser.
 4. Click **Check for changes**. The first time, the console reads your file first. Where Figma already has a value, the console starts with Figma's value. Then it adds everything Figma does not have yet.
 5. Look over the differences, then click **Sync now**.
 
@@ -81,7 +65,7 @@ The sample draft already has changes that are not live yet. It passes every chec
 1. **See the safety checks work.** Open **Color**, pick Northfield, and set **Words on the main color** to **White**. White words on this green are too hard to read, so the console blocks Publish. The guide explains why and offers a fix. Click **Add to my draft** on its suggestion. The change saves right away.
 2. **See it in the real component.** Open **Components → Actions → Button**. In the preview, set **Preview** to **Real component**. This is the actual React button from Storybook.
 3. **Change something and watch it update.** Change the button **Corners** to **Round ends**. After a moment, the real button in the preview changes too.
-4. **Publish.** Click **Review and publish**. Pick the kind of update (the console suggests one), read the note the guide wrote, and click **Publish**. Then open the `dist` folder and look at `theme.css`. Its first line now shows the new version number.
+4. **Publish.** Click **Review and publish**. Pick the kind of update (the console suggests one), read the note the guide wrote, and click **Publish**. Then open http://127.0.0.1:5173/dist/theme.css. Its first line now shows the new version number.
 5. **Roll back.** Open **Versions** and roll back to 1.3.0. This makes a new version, so nothing is lost. Your unpublished changes stay in your draft.
 6. **Look at the icons.** Open **Icons** under Foundations. Point at any icon to see its name. Click one to see its sizes and the code engineers use. Change **Line thickness** to make every icon bolder.
 7. **Give the page a gradient or a picture.** Open **Color** and find **Page style**. Pick **Gradient** or **Picture**. For a picture, the guide makes one from your brand colors first. You can keep it or upload your own. Then slide **Window and card see-through** to let the page show behind cards. The checks test the words on every part of the page.
@@ -96,7 +80,7 @@ The sample draft already has changes that are not live yet. It passes every chec
 
 ## Start over with the sample data
 
-This erases every change and version and puts the sample data back.
+This puts the sample data back in the project folder, which is where `npm start` begins from.
 ```
 npm run reset-sample-data
 ```
@@ -111,7 +95,8 @@ This checks that token files save and load without losing anything, that the saf
 ### Testing (for contributors)
 
 `npm test` runs two kinds of tests, one after the other:
-- `npm run test:node`: the engine, contrast, Figma sync, publishing, and server tests (Node's own test runner, `test/*.test.mjs`).
+- `npm run test:node`: the engine, contrast, Figma sync, publishing, storage, API, and sign-in tests (Node's own test runner, `test/*.test.mjs`).
+- `npm run test:worker`: the real Worker in `wrangler dev` against a stand-in for GitHub, through saving, a large font, publishing, a restart, and sign-in.
 - `npm run test:components`: the React component tests (Vitest, React Testing Library, and jsdom, `test/components/*.test.jsx`). Each test checks roles, names, and states, and runs axe on what it rendered. jsdom cannot measure colors, so color contrast is checked by `npm run audit:storybook` instead.
 
 `npm run check:types` checks `src/index.d.ts` with TypeScript, using the sample app in `test/types/`. `npm run check:all` runs it too.
@@ -139,21 +124,11 @@ This opens every page of the console for both brands, both modes, and both scree
 | `npm run sweep` | Clicks every button and switch on every page and watches for errors. It also looks for parts of the preview that spill out of their frame on a computer or a phone, and for pages that scroll sideways on a phone. |
 | `npm run check:all` | Runs all of the checks above, one after another. |
 
-## Keep a history in Git (optional)
-
-If you want every publish saved in Git, run these once in the project folder:
-```
-git init
-git add -A
-git commit -m "Start"
-```
-After that, every time you publish, the console makes a Git commit for you.
-
 ---
 
 ## Put it online for your team
 
-The console can run on Cloudflare Workers, with the design system in a GitHub repository and the company's sign-in in front. Every publish becomes a commit. The steps are in `docs/cloudflare.md`.
+The console runs on Cloudflare Workers, with the design system in a GitHub repository and the company's sign-in in front. Every publish becomes a commit, and GitHub Actions deploys each change. The steps are in `docs/cloudflare.md`.
 
 ## Where things live
 
@@ -168,12 +143,12 @@ The console can run on Cloudflare Workers, with the design system in a GitHub re
 | `figma.json` | The link to your Figma library. |
 | `.figma-sync.json` | What the console and Figma agreed on at the last sync, so the next sync can tell who changed what. |
 | `console/` | The Brand Console itself. `engine.js` holds the color math and checks. `registry.js` lists all 67 components. `figma.js` turns the design system into Figma variables and back. `basics.js` holds the small pieces those files share. `app.js` is the screen. |
-| `server/` | The small local server that saves, publishes, rolls back, and talks to Figma. It reads and writes files only through `server/storage/`: on this computer that is the project folder and `.env`, and in tests it is memory. |
+| `server/` | What the Worker runs to save, publish, roll back, and talk to Figma: the API, the store, and the Figma sync. They read and write files only through `server/storage/`: GitHub with a Durable Object online, and the project folder or memory for scripts and tests. |
 | `worker/` | The console on Cloudflare Workers: the Worker, the Durable Object that holds unpublished changes, and the Cloudflare Access sign-in check. `wrangler.jsonc` is its settings. See `docs/cloudflare.md`. |
 | `src/components/ui/` | All 68 React components. |
 | `src/stories/` | The Storybook pages for those components. |
 | `src/docs/` | The Guide pages in Storybook: Start here, Foundations, and Contributing. |
-| `docs/` | Notes for contributors: the component rules, the hosting and sign-in plan, putting the console on Cloudflare, and the plan to move off Radix. |
+| `docs/` | Notes for contributors: the component rules, putting the console on Cloudflare, and the plan to move off Radix. |
 | `test/` | The automatic tests. |
 
 ## What is in Phase 1, and what is not
@@ -206,7 +181,7 @@ The console can run on Cloudflare Workers, with the design system in a GitHub re
 - Publishing the package to your company's package registry.
 - Connecting to your real shadcn components.
 
-The "Viewing as" menu at the top only changes what you can edit on screen. It is not real security yet. The console stays on your own computer unless you set it up to be shared. If you do, it will not start without a long access code, and everyone must type that code. That is a stopgap. Read `docs/hosting-auth.md` for how it works, what it does not protect, and the plan for real sign-in with the company's single sign-on.
+Everyone who can sign in can do everything for now. Roles (Viewer, Editor, and Admin) are planned, with Microsoft Entra ID groups deciding who has which. Until then, the "Viewing as" menu only changes what the screen lets you edit.
 
 ---
 
@@ -235,7 +210,7 @@ This package is for our own apps only. It stays private and is never published t
 - **Checks in CI:** `npm run check:tokens` runs the same checks that guard Publish, with no console open. It ends with code 1 when a check blocks publishing, so a CI job can stop a token change that would make words hard to read. Use `-- --dir path/to/tokens` to check another tokens folder, `-- --live` for the live version, and `-- --json` for every result as JSON.
 - **Token files:** Brand colors, foundations, and component settings live in `tokens/`. Component settings and AI guidance are stored under `$extensions["org.brand-console"]`, because the W3C format has no type for choices like "tiles" or "sentence case".
 - **Final values for other tools:** `tokens.resolved.json` sits next to `theme.css` in `dist/` (the live version), `build/draft/` (the draft), and each `releases/v<version>/` folder. It has every color per brand and per light or dark mode, every size per screen type and text size, and every CSS variable from `theme.css`, all as final values. Apps can import it as `brand-console/tokens.resolved.json`. The build and every publish write it on their own. To write it somewhere else, run `npm run export:tokens -- --live --out ../my-app/tokens.json` (leave out `--live` for the draft). It is a snapshot. It has no aliases like `{color.brand.primary}`, so tools that need the links between tokens should read `tokens/*.tokens.json` instead. A full alias export, like Style Dictionary makes, may come later.
-- **API** (this computer only, unless it is set up to be shared; see `docs/hosting-auth.md`): `GET /api/state`, `PUT /api/draft`, `POST /api/publish`, `POST /api/rollback`, `POST /api/flag`, `POST /api/ask`, `POST /api/fonts`, and the Figma routes under `/api/figma/`. A shared server also has `POST /api/login` and `POST /api/logout`, and scripts send `Authorization: Bearer <code>`.
+- **API** (served by the Worker, behind Cloudflare Access): `GET /api/state`, `PUT /api/draft`, `POST /api/publish`, `POST /api/rollback`, `POST /api/flag`, `POST /api/ask`, `POST /api/fonts`, and the Figma routes under `/api/figma/`. Changes must come from the console's own address.
 - **Checks run twice.** The console blocks Publish, and the server checks again before it writes a release.
 - **Version numbers:** Each publish picks one of three kinds of update, so engineers know how careful to be.
   - **Patch** (1.4.0 to 1.4.1): only values change, like a color or a size. Every CSS variable and component name stays the same.

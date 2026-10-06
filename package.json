@@ -29,7 +29,6 @@
   ],
   "scripts": {
     "start": "node scripts/start.mjs",
-    "console": "node server/index.mjs",
     "worker:assets": "node scripts/build-worker-assets.mjs",
     "worker:dev": "node scripts/build-worker-assets.mjs --no-storybook && wrangler dev",
     "worker:deploy": "node scripts/deploy-worker.mjs",

@@ -1,5 +1,5 @@
-// Asks Claude for the console's guide. Uses only fetch, so the Node server and the Cloudflare Worker share it.
-export function createAsk({ key, model, fetch: fetchFn = globalThis.fetch, missingKeyHelp = "Add ANTHROPIC_API_KEY to the .env file." }) {
+// Asks Claude for the console's guide. Uses only fetch, so it runs in the Cloudflare Worker.
+export function createAsk({ key, model, fetch: fetchFn = globalThis.fetch, missingKeyHelp = "Add the ANTHROPIC_API_KEY secret." }) {
   return async function ask(turns) {
     if (!key) throw Object.assign(new Error(`No Claude API key is set. ${missingKeyHelp}`), { status: 503 });
     const r = await fetchFn("https://api.anthropic.com/v1/messages", {

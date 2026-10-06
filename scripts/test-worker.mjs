@@ -2,61 +2,30 @@
 // console's whole flow: sign-in, the API, a big font in the Durable Object, a publish that becomes one commit,
 // a restart that keeps unpublished changes, and a Worker with Cloudflare Access missing refusing everything.
 // Run with:  npm run test:worker
-import http from "node:http";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn, execFileSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { createGitHubMock } from "../test/github-mock.mjs";
 import { createDiskStorage } from "../server/storage/disk.mjs";
 import { createStore } from "../server/store.mjs";
+import { startFakeGitHub, FAKE_REPO, FAKE_TOKEN } from "./fake-github.mjs";
+import { startWranglerDev } from "./wrangler-dev.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const REPO = "acme/design-system";
+const REPO = FAKE_REPO;
 const results = [];
 // Each result is printed as it happens, so a log shows how far the test got.
 const check = (ok, what) => { const line = `${ok ? "ok  " : "FAIL"} ${what}`; results.push(line); console.log(line); if (!ok) process.exitCode = 1; };
 
 // The stand-in for GitHub, holding this project's design system files, served over HTTP for the Worker to reach.
-const disk = createDiskStorage(root), files = {};
-for (const p of [...await disk.list("tokens"), ...await disk.list("releases"), ...await disk.list("dist"), ...await disk.list("build/draft"), "CHANGELOG.md"]) files[p] = await disk.readBytes(p);
-const github = createGitHubMock({ repo: REPO, files });
-const ghServer = http.createServer(async (req, res) => {
-  const chunks = []; for await (const c of req) chunks.push(c);
-  const r = await github.fetch(`http://${req.headers.host}${req.url}`, { method: req.method, headers: { authorization: req.headers.authorization || "" }, body: chunks.length ? Buffer.concat(chunks).toString() : undefined });
-  res.writeHead(r.status, { "content-type": "application/json" }); res.end(Buffer.from(await r.arrayBuffer()));
-});
-await new Promise((ok) => ghServer.listen(0, "127.0.0.1", ok));
-const ghUrl = `http://127.0.0.1:${ghServer.address().port}`;
+const fake = await startFakeGitHub(root);
+const github = fake.github, ghUrl = fake.url;
 
 execFileSync(process.execPath, [path.join(root, "scripts/build-worker-assets.mjs"), "--no-storybook"], { cwd: root, stdio: "ignore" });
 const state = fs.mkdtempSync(path.join(os.tmpdir(), "bc-worker-"));
-const freePort = () => new Promise((ok) => { const s = http.createServer().listen(0, "127.0.0.1", () => { const p = s.address().port; s.close(() => ok(p)); }); });
-
-// wrangler runs in its own process group, so stopping it stops workerd too. Sending a signal to `npx` is not enough:
-// on Linux, npx does not pass it on, and the test waited forever for a Worker that never stopped.
-async function startWorker(vars) {
-  const port = await freePort();
-  const args = [path.join(root, "node_modules/wrangler/bin/wrangler.js"), "dev", "--ip", "127.0.0.1", "--port", String(port), "--persist-to", state, "--log-level", "warn", "--show-interactive-dev-session=false", "--inspector-port", String(await freePort())];
-  for (const [k, v] of Object.entries(vars)) args.push("--var", `${k}:${v}`);
-  const kid = spawn(process.execPath, args, { cwd: root, detached: true, env: { ...process.env, WRANGLER_SEND_METRICS: "false" }, stdio: ["ignore", "pipe", "pipe"] });
-  let log = ""; kid.stdout.on("data", (d) => (log += d)); kid.stderr.on("data", (d) => (log += d));
-  const stop = () => new Promise((ok) => {
-    if (kid.exitCode !== null || kid.signalCode !== null) return ok();
-    const force = setTimeout(() => { try { process.kill(-kid.pid, "SIGKILL"); } catch { /* Already gone. */ } }, 5000);
-    kid.once("exit", () => { clearTimeout(force); ok(); });
-    try { process.kill(-kid.pid, "SIGTERM"); } catch { clearTimeout(force); ok(); }
-  });
-  const base = `http://127.0.0.1:${port}`;
-  for (let i = 0; ; i++) {
-    try { const r = await fetch(base + "/api/health"); if (r.status) break; } catch { /* Not up yet. */ }
-    if (i >= 300 || kid.exitCode !== null) { await stop(); throw new Error(`wrangler dev did not start within a minute.\n${log.slice(-3000)}`); }
-    await new Promise((ok) => setTimeout(ok, 200));
-  }
-  return { base, log: () => log, stop };
-}
-const DEV = { GITHUB_REPO: REPO, GITHUB_BRANCH: "main", GITHUB_TOKEN: "test-token", GITHUB_API: ghUrl, ACCESS_LOCAL_DEV: "allow" };
+const startWorker = (vars) => startWranglerDev({ root, vars, persistTo: state });
+const DEV = { GITHUB_REPO: REPO, GITHUB_BRANCH: "main", GITHUB_TOKEN: FAKE_TOKEN, GITHUB_API: ghUrl, ACCESS_LOCAL_DEV: "allow" };
 
 let w = await startWorker(DEV);
 const call = async (method, p, body, headers = { origin: w.base }) => {
@@ -129,13 +98,13 @@ try {
 }
 
 // A Worker with no Cloudflare Access settings, and no local switch, serves nothing.
-w = await startWorker({ GITHUB_REPO: REPO, GITHUB_TOKEN: "test-token", GITHUB_API: ghUrl });
+w = await startWorker({ GITHUB_REPO: REPO, GITHUB_TOKEN: FAKE_TOKEN, GITHUB_API: ghUrl });
 try {
   const page = await fetch(w.base + "/"), api = await fetch(w.base + "/api/state");
   check(page.status === 403 && api.status === 403 && /not set up for sign-in/.test((await api.json()).error), "with Access not set up, the console page and the API are refused (403)");
 } finally {
   await w.stop();
-  ghServer.close();
+  await fake.close();
   fs.rmSync(state, { recursive: true, force: true });
   console.log(`\n${results.filter((r) => r.startsWith("ok")).length} of ${results.length} checks passed.`);
   if (process.exitCode) console.log("\nwrangler output:\n" + w.log().slice(-3000));

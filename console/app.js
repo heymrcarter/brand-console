@@ -1318,30 +1318,22 @@ window.addEventListener("resize",(()=>{let w=window.innerWidth;return()=>{const 
    SERVER: load, autosave, publish
    ===================================================================== */
 async function api(method,url,body,signal){
-  const r=await fetch(url,{method,headers:{"content-type":"application/json"},body:body?JSON.stringify(body):undefined,signal});
+  // redirect "manual": when the Cloudflare Access sign-in ends, Access answers with a redirect to its sign-in page,
+  // which a request from the page cannot follow. Seeing the redirect is how the console knows to ask for a reload.
+  const r=await fetch(url,{method,headers:{"content-type":"application/json"},body:body?JSON.stringify(body):undefined,signal,redirect:"manual"});
+  if(r.type==="opaqueredirect"){showSignedOut();throw Object.assign(new Error("Your sign-in has ended."),{status:401});}
   const j=await r.json().catch(()=>({}));
-  if(r.status===401&&j.signIn) showSignIn();
+  if(r.status===403&&/sign in|sign-in/i.test(j.error||"")) showSignedOut();
   if(!r.ok) throw Object.assign(new Error(j.error||`The server returned an error (${r.status}).`),{status:r.status});
   return j;
 }
-/* A shared console (see docs/hosting-auth.md) asks for the team's access code. On your own computer, this never shows. */
-function showSignIn(){
-  if(document.getElementById("signin")) return;
-  document.getElementById("app").innerHTML=`<div class="boot"><b>Sign in to the Brand Console</b>
-    <p>This console is shared with your team. Type the access code your admin team gave you.</p>
-    <form id="signin" class="field" style="text-align:left">
-      <label class="fl" for="signin-code">Access code</label>
-      <input class="inp" id="signin-code" type="password" autocomplete="current-password" required>
-      <div class="btns"><button class="btn p" type="submit">Sign in</button></div>
-      <p class="under" id="signin-note" role="status"></p>
-    </form></div>`;
-  const f=document.getElementById("signin"),code=document.getElementById("signin-code"),note=document.getElementById("signin-note");
-  code.focus();
-  f.addEventListener("submit",async e=>{e.preventDefault();note.textContent="Checking your code.";
-    try{await api("POST","/api/login",{code:code.value});
-      // If someone was signed out while working, keep their screen and save what they had.
-      if(S.draft){render();scheduleSave();}else boot();}
-    catch(err){note.textContent=err.message;code.focus();}});
+/* Cloudflare Access signs people in before the page loads. If the sign-in ends while the console is open, say so. */
+function showSignedOut(){
+  if(document.getElementById("signedout")) return;
+  const el=document.createElement("div");el.id="signedout";el.className="toast";el.setAttribute("role","alert");
+  el.innerHTML=`Your sign-in has ended, so changes cannot be saved. <button class="btn s" type="button">Reload to sign in</button>`;
+  el.querySelector("button").addEventListener("click",()=>location.reload());
+  document.body.appendChild(el);
 }
 function fmtDate(d){const t=new Date(d+"T12:00:00");return isNaN(t)?d:t.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});}
 function mapHistory(v){return v.map(x=>({v:x.version,date:fmtDate(x.date),who:x.who,note:x.note,flag:!!x.flag,rb:!!x.rollbackOf}));}
@@ -1377,10 +1369,10 @@ async function boot(){
   document.getElementById("app").innerHTML=`<div class="boot">Loading your design system…</div>`;
   try{if(window.__EMBED__)throw new Error("offline");const r=await api("GET","/api/state");loadState(r);greet();render();}
   catch(e){
-    if(e.status===401) return;
+    if(e.status===401||document.getElementById("signedout")) return;
     if(window.__EMBED__){const E=window.__EMBED__;S.offline=true;S.snaps=E.snaps;loadState({draft:E.draft,published:E.published,history:E.history});greet();render();
       (async()=>{try{if(window.claude&&claude.use){const [smp,dl]=await Promise.all([claude.use("sample").catch(()=>null),claude.use("downloads").catch(()=>null)]);S.ai.sample=smp||null;S.dl=dl||null;render();}}catch(err){}})();
       return;}
-    document.getElementById("app").innerHTML=`<div class="boot"><b>The console cannot reach its server.</b><p>Open a terminal in the project folder and run <code>npm start</code>. Then reload this page.</p><p class="under">${esc(e.message)}</p></div>`;}
+    document.getElementById("app").innerHTML=`<div class="boot"><b>The console could not load the design system.</b><p>Reload the page to try again. On your own computer, start the console with <code>npm start</code>.</p><p class="under">${esc(e.message)}</p></div>`;}
 }
 boot();
