@@ -170,7 +170,7 @@ test("the store runs one call at a time, so a publish sees a save that started f
 });
 
 test("the store, the Figma sync, and the storage interface use no Node-only features, so a Worker can run them", () => {
-  for (const f of ["server/store.mjs", "server/figma.mjs", "server/engine.mjs", "server/storage/storage.mjs", "server/storage/memory.mjs", "server/storage/github.mjs", "worker/durable-storage.mjs"]) {
+  for (const f of ["server/store.mjs", "server/figma.mjs", "server/engine.mjs", "server/storage/storage.mjs", "server/storage/memory.mjs", "server/storage/github.mjs", "server/storage/github-app.mjs", "worker/durable-storage.mjs"]) {
     const code = fs.readFileSync(path.join(root, f), "utf8").replace(/\/\/.*$/gm, "");
     const imports = [...code.matchAll(/^\s*import\s[^;]*?from\s+["']([^"']+)["']/gm)].map((m) => m[1]);
     assert.deepEqual(imports.filter((i) => !i.startsWith(".")), [], `${f} imports only project files`);
