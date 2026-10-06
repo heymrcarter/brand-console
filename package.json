@@ -32,7 +32,7 @@
     "console": "node server/index.mjs",
     "worker:assets": "node scripts/build-worker-assets.mjs",
     "worker:dev": "node scripts/build-worker-assets.mjs --no-storybook && wrangler dev",
-    "worker:deploy": "node scripts/build-worker-assets.mjs && wrangler deploy",
+    "worker:deploy": "node scripts/deploy-worker.mjs",
     "storybook": "storybook dev -p 6006",
     "build": "node scripts/build.mjs",
     "export:tokens": "node scripts/export-tokens.mjs",

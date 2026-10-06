@@ -1,0 +1,60 @@
+# Tests the console, then deploys it to Cloudflare Workers. See docs/cloudflare.md.
+# Settings come from this repository's Actions variables and secrets, never from wrangler.jsonc.
+# Every push to main deploys, including the commits the console makes when someone publishes. That rebuilds
+# Storybook too, so it shows the design system as it was just published.
+name: Deploy Worker
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time. A newer push waits for the one running, instead of stopping it halfway.
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      # The real Worker in wrangler dev, against a stand-in for GitHub. It needs no Cloudflare account.
+      - run: npm run test:worker
+
+  deploy:
+    needs: test
+    # Only the repository the console publishes to deploys it. Copies and forks of it never do.
+    if: github.repository == vars.REPO
+    runs-on: ubuntu-latest
+    env:
+      REPO: ${{ vars.REPO }}
+      BRANCH: ${{ vars.BRANCH }}
+      GH_APP_ID: ${{ vars.GH_APP_ID }}
+      GH_APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
+      TEAM_DOMAIN: ${{ vars.TEAM_DOMAIN }}
+      POLICY_AUD: ${{ vars.POLICY_AUD }}
+      GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Checks the settings before the long build, so a mistake fails in seconds with a clear message.
+      - run: node scripts/deploy-worker.mjs --check
+      - run: npm run worker:assets
+      - run: node scripts/deploy-worker.mjs

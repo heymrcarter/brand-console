@@ -28,39 +28,45 @@ A GitHub App can only reach the repositories it is installed on, and its tokens 
 7. Under **Private keys**, click **Generate a private key**. Your browser downloads a `.pem` file. Keep it somewhere safe. You need it in step 3.
 8. Click **Install App**, and install it on the design system repository only. The page you land on ends in `/installations/12345678`. That number is the **installation ID**.
 
-## 2. Fill in the settings
+## 2. Add the settings to the repository
 
-Open `wrangler.jsonc` and fill in `vars`:
+GitHub Actions deploys the Worker (`.github/workflows/deploy-worker.yml`), with settings stored in the repository, not in `wrangler.jsonc`. In the repository the console publishes to, go to **Settings > Secrets and variables > Actions**.
 
-| Setting | What to put |
-|---|---|
-| `GITHUB_REPO` | The repository, like `acme/design-system` |
-| `GITHUB_BRANCH` | The branch the console reads and publishes to. Usually `main`. |
-| `GITHUB_APP_ID` | The App ID from step 1 |
-| `GITHUB_APP_INSTALLATION_ID` | The installation ID from step 1 |
-| `TEAM_DOMAIN` | Leave empty for now. Step 5 fills it in. |
-| `POLICY_AUD` | Leave empty for now. Step 5 fills it in. |
+On the **Variables** tab, add these. GitHub does not allow names that start with `GITHUB_`, so they are shorter than the Worker's own names:
+
+| Variable | What to put | The Worker sees it as |
+|---|---|---|
+| `REPO` | This repository, like `acme/design-system`. Only this repository deploys. | `GITHUB_REPO` |
+| `BRANCH` | The branch the console reads and publishes to. Usually `main`. | `GITHUB_BRANCH` |
+| `GH_APP_ID` | The App ID from step 1 | `GITHUB_APP_ID` |
+| `GH_APP_INSTALLATION_ID` | The installation ID from step 1 | `GITHUB_APP_INSTALLATION_ID` |
+| `TEAM_DOMAIN` | Leave it out for now. Step 5 adds it. | `TEAM_DOMAIN` |
+| `POLICY_AUD` | Leave it out for now. Step 5 adds it. | `POLICY_AUD` |
+| `CLOUDFLARE_ACCOUNT_ID` | Your Cloudflare account ID, from the dashboard's **Account home** | |
 
 ## 3. Add the secrets
 
-Secrets go to Cloudflare, never into the repository. Sign in once with `npx wrangler login`, then:
+On the **Secrets** tab, add these:
 
-```sh
-npx wrangler secret put GITHUB_APP_PRIVATE_KEY < path/to/your-app.private-key.pem
-npx wrangler secret put ANTHROPIC_API_KEY      # optional: connects the console's guide to Claude
-```
+| Secret | What to put |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | A token for deploying. In the Cloudflare dashboard, go to **My Profile > API Tokens > Create Token**, and use the **Edit Cloudflare Workers** template. |
+| `GH_APP_PRIVATE_KEY` | The whole `.pem` file from step 1, from `-----BEGIN` to `-----END`. |
+| `ANTHROPIC_API_KEY` | Optional: connects the console's guide to Claude. |
 
-`wrangler secret put` asks for the value when you leave off the `<`. Do not paste secrets into commands.
+Each deploy sends `GH_APP_PRIVATE_KEY` and `ANTHROPIC_API_KEY` to Cloudflare as encrypted Worker secrets. A secret that is not in the repository is left as it is in Cloudflare, so a key you already set with `npx wrangler secret put` keeps working.
 
 The Figma token does not go here. People add it in the console under **Sync with Figma**, and the console keeps it in the Durable Object.
 
 ## 4. Deploy
 
-```sh
-npm run worker:deploy
-```
+Push to `main`, or open the **Actions** tab, pick **Deploy Worker**, and click **Run workflow**. It runs the tests, then checks every setting and lists anything wrong before it builds, then deploys. Last, it checks that the Worker's address is closed to anyone who has not signed in.
 
-This builds the console and Storybook into `.worker-assets/` and deploys the Worker. Wrangler prints its address, like `https://brand-console.your-account.workers.dev`. Opening it now shows "This console is not set up for sign-in yet." That is expected: the next step turns sign-in on.
+The first run prints the Worker's address, like `https://brand-console.your-account.workers.dev`. Opening it shows "This console is not set up for sign-in yet." That is expected: step 5 turns sign-in on.
+
+Every push to `main` deploys again, including the commits the console makes when someone publishes. That also rebuilds Storybook, so it shows what was just published.
+
+**Do not deploy from your computer.** `wrangler.jsonc` has no settings in it on purpose, so `npx wrangler deploy` would ship a Worker that refuses every request until Actions deploys again. `npm run worker:deploy` stops and says so. To check a change first, run `node scripts/deploy-worker.mjs --dry-run` with the settings in your shell.
 
 ## 5. Turn on Cloudflare Access
 
@@ -68,8 +74,8 @@ This builds the console and Storybook into `.worker-assets/` and deploys the Wor
 2. Next to `workers.dev`, click **Enable Cloudflare Access**. (On a custom domain, add an Access application for that domain instead.)
 3. Click **Manage Cloudflare Access**, and set the policy to the people or groups who use the console, like the brand, admin, and design teams.
 4. On the Access application's page, copy the **Application Audience (AUD) Tag**. That is `POLICY_AUD`.
-5. Your team domain is `https://` followed by your Zero Trust team name and `.cloudflareaccess.com`, like `https://your-team.cloudflareaccess.com`. It is also the address of the Access sign-in page. That is `TEAM_DOMAIN`.
-6. Put both in `wrangler.jsonc` and run `npm run worker:deploy` again.
+5. Your team domain is `https://` followed by your Zero Trust team name and `.cloudflareaccess.com`, like `https://your-team.cloudflareaccess.com`. It is also the address of the Access sign-in page. That is `TEAM_DOMAIN`. Check that it has no spaces.
+6. Add both as repository variables, as in step 2, then run the **Deploy Worker** workflow again.
 
 Open the address again. Access asks you to sign in, then the console opens.
 
@@ -82,6 +88,8 @@ The free plan gives a Worker 10 ms of CPU time per request, and allows 100,000 r
 - GitHub is the other limit. A Worker on the free plan can make 50 outgoing requests per request. Loading the console takes about 13 GitHub requests the first time and none after that, a save none, and a publish 4, plus one for each new font file.
 
 ## Running it on your computer
+
+This is for trying changes. It never deploys.
 
 ```sh
 cp .dev.vars.example .dev.vars   # then fill in GITHUB_TOKEN or the GitHub App settings
