@@ -8,8 +8,10 @@
 // Every method is async, and they run one at a time, so a save can never land in the middle of a publish.
 import { loadEngine } from "./engine.mjs";
 
-export function createStore(storage) {
-  const E = loadEngine();
+// copyEngineResults: false skips the engine's defensive copies (see server/engine.mjs), for the Worker. The store
+// never changes what the engine hands back, so its results are the same either way.
+export function createStore(storage, { copyEngineResults = true } = {}) {
+  const E = loadEngine(undefined, { copy: copyEngineResults });
   const readJson = async (p) => { const t = await storage.read(p); return t === null ? null : JSON.parse(t); };
   const writeFile = (p, data) => storage.write(p, typeof data === "string" || data instanceof Uint8Array ? data : JSON.stringify(data, null, 2) + "\n");
   const err = (status, message) => Object.assign(new Error(message), { status });
@@ -24,8 +26,8 @@ export function createStore(storage) {
   async function writeTokenDir(dir, files) {
     await Promise.all(Object.entries(files).filter(([k]) => k.startsWith("tokens/")).map(([k, v]) => writeFile(`${dir}/${k.slice(7)}`, v)));
   }
-  async function writeOutputs(dir, st, version) {
-    const f = E.files(st, version);
+  // f: outputs already made for this state and version, so a publish makes them once for both folders.
+  async function writeOutputs(dir, st, version, f = E.files(st, version)) {
     await Promise.all(Object.entries(f).filter(([k]) => !k.startsWith("tokens/")).map(([k, v]) => writeFile(`${dir}/${k}`, v)));
     await copyFonts(dir, st);
   }
@@ -90,8 +92,9 @@ export function createStore(storage) {
     st = clean(st); st.version = version;
     const dir = `releases/v${version}`;
     await writeTokenDir(`${dir}/tokens`, E.stateToFiles(st));
-    await writeOutputs(dir, st, version);
-    await writeOutputs("dist", st, version);
+    const f = E.files(st, version);
+    await writeOutputs(dir, st, version, f);
+    await writeOutputs("dist", st, version, f);
     const ix = await index();
     ix.versions.unshift({ version, date: meta.date || new Date().toISOString().slice(0, 10), who: meta.who || "Brand team", note: meta.note || "Updated the design system.", ...(meta.rollbackOf ? { rollbackOf: meta.rollbackOf } : {}) });
     await saveIndex(ix);

@@ -128,6 +128,28 @@ test("the store works the same in memory as on disk, and never touches the disk"
   assert.ok(!fs.existsSync(path.join(root, `releases/v${v}`)));
 });
 
+test("with copyEngineResults: false the store gives the same results and never changes the engine's own objects", async () => {
+  const engine = await import("../console/engine.js");
+  const constants = () => JSON.stringify({ BASE: engine.BASE, PALETTES: engine.PALETTES, BRANDS: engine.BRANDS, FONTS: engine.FONTS, GRAYS: engine.GRAYS });
+  const before = constants();
+  const run = async (copyEngineResults) => {
+    const memory = await projectInMemory(), store = createStore(memory, { copyEngineResults });
+    const d = await store.draft(); d.shape.radius += 3; d.brands.northfield.palette.groups[0].colors[0].name = "Renamed";
+    await store.saveDraft(d);
+    const v = await store.publish({ note: "Same either way.", who: "Test", bump: "minor" });
+    const d2 = await store.draft(); d2.type.scale = 1.3; await store.saveDraft(d2);
+    await store.rollback({ version: "1.4.0", who: "Test" });
+    const out = {};
+    for (const p of await memory.list("")) out[p] = (await memory.read(p)).replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z/g, "TIME");
+    return { v, out, draft: await store.draft() };
+  };
+  const copied = await run(true), direct = await run(false);
+  assert.deepEqual(direct.draft, copied.draft);
+  assert.deepEqual(Object.keys(direct.out), Object.keys(copied.out));
+  for (const p of Object.keys(copied.out)) assert.equal(direct.out[p], copied.out[p], p);
+  assert.equal(constants(), before, "the engine's built-in defaults are unchanged");
+});
+
 test("the store runs one call at a time, so a publish sees a save that started first", async () => {
   // Real storage takes time for each write, so a call that does not wait its turn would read old files.
   const memory = await projectInMemory();

@@ -19,10 +19,13 @@ function own(v) {
 }
 
 // root is kept so callers do not change. The engine always comes from this project's console folder.
-export function loadEngine(root) {
+// copy: false hands back the engine's own functions and objects, with no copies. Copying every result costs most
+// of the CPU time a save or publish takes, which matters in a Cloudflare Worker. Code that uses copy: false must
+// never change what the engine hands back.
+export function loadEngine(root, { copy = true } = {}) {
   const E = {};
   for (const mod of Object.values(ENGINE_MODULES)) {
-    for (const [name, v] of Object.entries(mod)) E[name] = typeof v === "function" ? (...a) => own(v(...a)) : own(v);
+    for (const [name, v] of Object.entries(mod)) E[name] = !copy ? v : typeof v === "function" ? (...a) => own(v(...a)) : own(v);
   }
   return E;
 }
