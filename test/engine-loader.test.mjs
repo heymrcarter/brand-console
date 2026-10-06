@@ -55,3 +55,16 @@ test("check:tokens passes good tokens and fails ones that block publishing", () 
   assert.match(no.stdout, /MUST FIX\s+Northfield: button words are too hard to read/);
   for (const d of [good, bad]) fs.rmSync(d, { recursive: true, force: true });
 });
+
+// The engine files are ES modules. A Worker or a script may import any one of them first, with no web page around it.
+// Each must load on its own, without touching the page, and still give the full base system.
+test("each engine module loads first on its own, without a web page", () => {
+  for (const f of ["basics.js", "icons.js", "registry.js", "engine.js", "figma.js"]) {
+    const code = `for (const k of ["window", "document", "navigator", "localStorage"]) Object.defineProperty(globalThis, k, { get() { throw new Error("touched " + k + " while loading"); } });
+await import(${JSON.stringify(path.join(root, "console", f))});
+const { BASE, REG_ORDER } = await import(${JSON.stringify(path.join(root, "console", "registry.js"))}).then(async (r) => ({ ...(await import(${JSON.stringify(path.join(root, "console", "engine.js"))})), REG_ORDER: r.REG_ORDER }));
+if (REG_ORDER.some((id) => !BASE.comp[id])) throw new Error("some components have no defaults in BASE");`;
+    const r = spawnSync(process.execPath, ["--input-type=module", "-e", code], { encoding: "utf8" });
+    assert.equal(r.status, 0, `${f} first: ${r.stderr}`);
+  }
+});
