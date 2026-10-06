@@ -15,7 +15,8 @@ import { createStore } from "../server/store.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = "acme/design-system";
 const results = [];
-const check = (ok, what) => { results.push(`${ok ? "ok  " : "FAIL"} ${what}`); if (!ok) process.exitCode = 1; };
+// Each result is printed as it happens, so a log shows how far the test got.
+const check = (ok, what) => { const line = `${ok ? "ok  " : "FAIL"} ${what}`; results.push(line); console.log(line); if (!ok) process.exitCode = 1; };
 
 // The stand-in for GitHub, holding this project's design system files, served over HTTP for the Worker to reach.
 const disk = createDiskStorage(root), files = {};
@@ -33,18 +34,27 @@ execFileSync(process.execPath, [path.join(root, "scripts/build-worker-assets.mjs
 const state = fs.mkdtempSync(path.join(os.tmpdir(), "bc-worker-"));
 const freePort = () => new Promise((ok) => { const s = http.createServer().listen(0, "127.0.0.1", () => { const p = s.address().port; s.close(() => ok(p)); }); });
 
+// wrangler runs in its own process group, so stopping it stops workerd too. Sending a signal to `npx` is not enough:
+// on Linux, npx does not pass it on, and the test waited forever for a Worker that never stopped.
 async function startWorker(vars) {
   const port = await freePort();
-  const args = ["wrangler", "dev", "--ip", "127.0.0.1", "--port", String(port), "--persist-to", state, "--log-level", "warn", "--show-interactive-dev-session=false", "--inspector-port", String(await freePort())];
+  const args = [path.join(root, "node_modules/wrangler/bin/wrangler.js"), "dev", "--ip", "127.0.0.1", "--port", String(port), "--persist-to", state, "--log-level", "warn", "--show-interactive-dev-session=false", "--inspector-port", String(await freePort())];
   for (const [k, v] of Object.entries(vars)) args.push("--var", `${k}:${v}`);
-  const kid = spawn("npx", args, { cwd: root, env: { ...process.env, WRANGLER_SEND_METRICS: "false" }, stdio: ["ignore", "pipe", "pipe"] });
+  const kid = spawn(process.execPath, args, { cwd: root, detached: true, env: { ...process.env, WRANGLER_SEND_METRICS: "false" }, stdio: ["ignore", "pipe", "pipe"] });
   let log = ""; kid.stdout.on("data", (d) => (log += d)); kid.stderr.on("data", (d) => (log += d));
+  const stop = () => new Promise((ok) => {
+    if (kid.exitCode !== null || kid.signalCode !== null) return ok();
+    const force = setTimeout(() => { try { process.kill(-kid.pid, "SIGKILL"); } catch { /* Already gone. */ } }, 5000);
+    kid.once("exit", () => { clearTimeout(force); ok(); });
+    try { process.kill(-kid.pid, "SIGTERM"); } catch { clearTimeout(force); ok(); }
+  });
   const base = `http://127.0.0.1:${port}`;
-  for (let i = 0; i < 150; i++) {
+  for (let i = 0; ; i++) {
     try { const r = await fetch(base + "/api/health"); if (r.status) break; } catch { /* Not up yet. */ }
+    if (i >= 300 || kid.exitCode !== null) { await stop(); throw new Error(`wrangler dev did not start within a minute.\n${log.slice(-3000)}`); }
     await new Promise((ok) => setTimeout(ok, 200));
   }
-  return { base, log: () => log, stop: () => new Promise((ok) => { kid.once("exit", ok); kid.kill("SIGINT"); }) };
+  return { base, log: () => log, stop };
 }
 const DEV = { GITHUB_REPO: REPO, GITHUB_BRANCH: "main", GITHUB_TOKEN: "test-token", GITHUB_API: ghUrl, ACCESS_LOCAL_DEV: "allow" };
 
@@ -127,6 +137,6 @@ try {
   await w.stop();
   ghServer.close();
   fs.rmSync(state, { recursive: true, force: true });
-  console.log(results.join("\n"));
+  console.log(`\n${results.filter((r) => r.startsWith("ok")).length} of ${results.length} checks passed.`);
   if (process.exitCode) console.log("\nwrangler output:\n" + w.log().slice(-3000));
 }

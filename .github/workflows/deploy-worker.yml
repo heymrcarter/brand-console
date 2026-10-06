@@ -20,6 +20,8 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # A hang must not use up the month's Actions minutes. A normal run takes a few minutes.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -30,12 +32,14 @@ jobs:
       - run: npm test
       # The real Worker in wrangler dev, against a stand-in for GitHub. It needs no Cloudflare account.
       - run: npm run test:worker
+        timeout-minutes: 5
 
   deploy:
     needs: test
     # Only the repository the console publishes to deploys it. Copies and forks of it never do.
     if: github.repository == vars.REPO
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       REPO: ${{ vars.REPO }}
       BRANCH: ${{ vars.BRANCH }}
