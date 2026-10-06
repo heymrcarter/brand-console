@@ -1,52 +1,54 @@
 /* Figma sync: the console's values as Figma variables, and back again.
    The console uses this for file import and export. The server uses it with the Figma REST API.
    Either side can change anything. When both sides change the same thing, a person picks which one to keep. */
-const FIG_COLLS=[
+import { BASE, BG_KEYS, BRANDS, CTX, EXT, FONTS, INK, clone, diff, files, flat, hexToRgb, normHex, rgbToHex, slug, uiFont, varsColor, withDefaults, wordOn, wordsForNewMain } from "./engine.js";
+import { REG, REG_ORDER } from "./registry.js";
+export const FIG_COLLS=[
   {id:"brand",name:"Brand colors",desc:"The main, second, and accent colors for each brand. Made by the Brand Console."},
   {id:"theme",name:"Theme colors",desc:"Every color the components use, for each brand in light and dark mode. Made by the Brand Console."},
   {id:"sets",name:"Color sets",desc:"Each brand's official color set. Made by the Brand Console."},
   {id:"found",name:"Foundations",desc:"Fonts, type sizes, corners, shadows, spacing, and shared colors. Made by the Brand Console."},
   {id:"comp",name:"Component settings",desc:"The choices the brand team makes for each component. Made by the Brand Console."}];
-const FIG_COLL=Object.fromEntries(FIG_COLLS.map(c=>[c.id,c]));
-function figModes(cid){return cid==="brand"?BRANDS.map(b=>b.name):cid==="theme"?BRANDS.flatMap(b=>[b.name+" light",b.name+" dark"]):["Value"];}
-function figModeBrand(cid,mode){const b=BRANDS.find(x=>mode===x.name||mode.startsWith(x.name+" "));return b?b.id:null;}
-function figModeMd(mode){return /dark$/.test(mode)?"dark":"light";}
+export const FIG_COLL=Object.fromEntries(FIG_COLLS.map(c=>[c.id,c]));
+export function figModes(cid){return cid==="brand"?BRANDS.map(b=>b.name):cid==="theme"?BRANDS.flatMap(b=>[b.name+" light",b.name+" dark"]):["Value"];}
+export function figModeBrand(cid,mode){const b=BRANDS.find(x=>mode===x.name||mode.startsWith(x.name+" "));return b?b.id:null;}
+export function figModeMd(mode){return /dark$/.test(mode)?"dark":"light";}
 /* Figma variable names cannot have dots or curly brackets. A slash makes a group. */
-function figName(t){return String(t).replace(/[.{}]/g,"-").replace(/\//g,"-").replace(/\s+/g," ").trim()||"Unnamed";}
+export function figName(t){return String(t).replace(/[.{}]/g,"-").replace(/\//g,"-").replace(/\s+/g," ").trim()||"Unnamed";}
 
 /* ---- values ---- */
-function figHex(v){if(typeof v!=="string")return null;const s=v.trim();
+export function figHex(v){if(typeof v!=="string")return null;const s=v.trim();
   const m=s.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/i);
   if(m){const a=m[4]===undefined?1:+m[4];return rgbToHex([+m[1],+m[2],+m[3]])+(a<1?Math.round(a*255).toString(16).padStart(2,"0").toUpperCase():"");}
   if(/^#?[0-9a-f]{8}$/i.test(s)){const h=normHex(s.slice(-8).length===8&&s[0]==="#"?s:"#"+s.replace("#",""));return h.slice(7)==="FF"?h.slice(0,7):h;}
   if(/^#?[0-9a-f]{6}$/i.test(s))return normHex(s);
   if(/^#?[0-9a-f]{3}$/i.test(s)){const t=s.replace("#","");return normHex(t.split("").map(c=>c+c).join(""));}
   return null;}
-function figColorIn(v){/* Figma {r,g,b,a}, DTCG color objects, or text */
+export function figColorIn(v){/* Figma {r,g,b,a}, DTCG color objects, or text */
   if(v&&typeof v==="object"&&"r" in v&&"g" in v&&"b" in v){const h=rgbToHex([v.r*255,v.g*255,v.b*255]),a=v.a===undefined?1:v.a;return a<0.999?h+Math.round(a*255).toString(16).padStart(2,"0").toUpperCase():h;}
   if(v&&typeof v==="object"&&(v.hex||Array.isArray(v.components))){const h=v.hex?figHex(v.hex):rgbToHex(v.components.map(x=>x*255));const a=v.alpha===undefined?1:v.alpha;return h&&a<0.999&&h.length===7?h+Math.round(a*255).toString(16).padStart(2,"0").toUpperCase():h;}
   return figHex(typeof v==="string"?v:"");}
-function figColorOut(hex){const h=figHex(hex)||"#000000",[r,g,b]=hexToRgb(h.slice(0,7)),a=h.length===9?parseInt(h.slice(7),16)/255:1;return {r:+(r/255).toFixed(5),g:+(g/255).toFixed(5),b:+(b/255).toFixed(5),a:+a.toFixed(4)};}
-function figNorm(type,v){if(v===undefined||v===null)return undefined;
+export function figColorOut(hex){const h=figHex(hex)||"#000000",[r,g,b]=hexToRgb(h.slice(0,7)),a=h.length===9?parseInt(h.slice(7),16)/255:1;return {r:+(r/255).toFixed(5),g:+(g/255).toFixed(5),b:+(b/255).toFixed(5),a:+a.toFixed(4)};}
+export function figNorm(type,v){if(v===undefined||v===null)return undefined;
   if(type==="COLOR")return figColorIn(v)||undefined;
   if(type==="FLOAT"){const n=typeof v==="number"?v:v&&typeof v==="object"&&typeof v.value==="number"?v.value:parseFloat(v);return isFinite(n)?+n.toFixed(4):undefined;}
   if(Array.isArray(v))return String(v[0]??"").trim();
   return String(v).trim();}
-function figSame(type,a,b){return a!==undefined&&b!==undefined&&figNorm(type,a)===figNorm(type,b);}
+export function figSame(type,a,b){return a!==undefined&&b!==undefined&&figNorm(type,a)===figNorm(type,b);}
 
 /* ---- the model: every value the console shares with Figma ---- */
-const FIG_THEME_LABEL={background:"page background",foreground:"body text",card:"window and card background","card-foreground":"words on windows and cards",primary:"main color","primary-foreground":"words on the main color",
+export const FIG_THEME_LABEL={background:"page background",foreground:"body text",card:"window and card background","card-foreground":"words on windows and cards",primary:"main color","primary-foreground":"words on the main color",
   secondary:"soft button background","secondary-foreground":"soft button words",muted:"quiet background","muted-foreground":"help text",accent:"tag background","accent-foreground":"tag words",
   destructive:"error button","destructive-foreground":"words on the error button","destructive-text":"error words","destructive-soft":"error message background","primary-edge":"edge of filled shapes","btn-border":"main button edge",
   success:"success color","success-soft":"success message background",warning:"warning color","warning-soft":"warning message background",border:"light border",input:"field border",ring:"keyboard focus outline",link:"links",
   "btn-bg":"main button","btn-fg":"main button words","btn-bg-hover":"main button under the mouse","field-border":"field border",panel:"window color with see-through"};
 /* Theme colors a person can set directly. The rest are made from other colors. */
-const FIG_THEME_SET={background:["bg","page"],card:["bg","card"],foreground:["pairs","body"],link:["pairs","link"],accent:["pairs","tagBg"],"accent-foreground":["pairs","tag"],secondary:["pairs","softBg"],"secondary-foreground":["pairs","soft"]};
-const FIG_RANGES={"type.headingWeight":[100,900],"type.scale":[1.05,1.6],"type.lineHeight":[1.1,2.2],"shape.radius":[0,40],base:[12,28],control:[24,80],gap:[2,48],pad:[4,64]};
-function figInRange(k,v){const r=FIG_RANGES[k];return !r||(v>=r[0]&&v<=r[1]);}
-function figSetBg(st,b,md,which,hex){const br=st.brands[b];br.bg=br.bg||{};br.bg[md]={...(br.bg[md]||{}),[which]:hex};br.seeds={...(br.seeds||{}),[BG_KEYS[md][which]]:hex};}
-function figSetPair(st,b,md,k,hex){const br=st.brands[b];br.pairs=br.pairs||{};br.pairs[md]={...(br.pairs[md]||{}),[k]:hex};}
-function figModel(st){
+export const FIG_THEME_SET={background:["bg","page"],card:["bg","card"],foreground:["pairs","body"],link:["pairs","link"],accent:["pairs","tagBg"],"accent-foreground":["pairs","tag"],secondary:["pairs","softBg"],"secondary-foreground":["pairs","soft"]};
+export const FIG_RANGES={"type.headingWeight":[100,900],"type.scale":[1.05,1.6],"type.lineHeight":[1.1,2.2],"shape.radius":[0,40],base:[12,28],control:[24,80],gap:[2,48],pad:[4,64]};
+export function figInRange(k,v){const r=FIG_RANGES[k];return !r||(v>=r[0]&&v<=r[1]);}
+export function figSetBg(st,b,md,which,hex){const br=st.brands[b];br.bg=br.bg||{};br.bg[md]={...(br.bg[md]||{}),[which]:hex};br.seeds={...(br.seeds||{}),[BG_KEYS[md][which]]:hex};}
+export function figSetPair(st,b,md,k,hex){const br=st.brands[b];br.pairs=br.pairs||{};br.pairs[md]={...(br.pairs[md]||{}),[k]:hex};}
+export function figModel(st){
   const E=[],add=(coll,name,type,o)=>E.push({key:`${coll}::${name}`,coll,name,type,modes:figModes(coll),...o});
   /* Brand colors */
   [["primary","Main color","The brand's main color. Buttons, links, and checked boxes use it."],["secondary","Second color","Used for tags, badges, and selected rows."],["accent","Accent color","Small touches, like a logo mark or a chart line. Never used for words."]].forEach(([k,n,d])=>
@@ -87,12 +89,12 @@ function figModel(st){
       set:(s,m,v)=>{const o=sl.opts.find(([x])=>String(x)===String(num?+v:v));if(!o)return `Use one of these: ${sl.opts.map(([x,l])=>`${x} (${l})`).join(", ")}.`;s.comp[id]={...(s.comp[id]||{}),[sl.k]:o[0]};}});}));
   return E;
 }
-function figPalFind(st,b,gName,cName){const pal=st.brands[b]&&st.brands[b].palette;if(!pal)return null;const g=pal.groups.find(x=>figName(x.name)===figName(gName));return g&&g.colors.find(x=>figName(x.name)===figName(cName))||null;}
-function figFlat(st){const out={};figModel(st).forEach(e=>e.modes.forEach(m=>{const v=figNorm(e.type,e.get(st,m));if(v!==undefined)out[`${e.key}@@${m}`]=v;}));return out;}
+export function figPalFind(st,b,gName,cName){const pal=st.brands[b]&&st.brands[b].palette;if(!pal)return null;const g=pal.groups.find(x=>figName(x.name)===figName(gName));return g&&g.colors.find(x=>figName(x.name)===figName(cName))||null;}
+export function figFlat(st){const out={};figModel(st).forEach(e=>e.modes.forEach(m=>{const v=figNorm(e.type,e.get(st,m));if(v!==undefined)out[`${e.key}@@${m}`]=v;}));return out;}
 
 /* ---- reading Figma ---- */
 /* From GET /v1/files/:key/variables/local. Aliases are followed to their color or number. */
-function figFromRest(meta){
+export function figFromRest(meta){
   const colls=meta&&meta.variableCollections||{},vars=meta&&meta.variables||{};
   const out={vals:{},types:{},ids:{},colls:{},alias:{},extra:0,source:"api"};
   const byName={};Object.values(colls).forEach(c=>{if(!c.remote&&!c.isExtension&&!byName[c.name])byName[c.name]=c;});
@@ -108,7 +110,7 @@ function figFromRest(meta){
   return out;
 }
 /* From token files exported by Figma (or by this console). Each file is one mode of one collection. */
-function figGuessFile(name,json){
+export function figGuessFile(name,json){
   const x=json&&json.$extensions&&json.$extensions[EXT]||{};
   let coll=FIG_COLLS.find(c=>c.name===x.collection||c.id===x.collection);
   const low=String(name||"").toLowerCase();
@@ -119,11 +121,11 @@ function figGuessFile(name,json){
   if(!mode&&modes.length===1)mode=modes[0];
   if(!mode)mode=modes.slice().sort((a,b)=>b.length-a.length).find(m=>low.includes(m.toLowerCase()))||null;
   return {coll:coll.id,mode};}
-let __guessBase=null;function BASE_FOR_GUESS(){if(!__guessBase)__guessBase=withDefaults(clone(BASE));return __guessBase;}
-function figFileTokens(json){const out=[];const walk=(o,path,type)=>{if(!o||typeof o!=="object")return;const t=o.$type||type;
+let __guessBase=null;export function BASE_FOR_GUESS(){if(!__guessBase)__guessBase=withDefaults(clone(BASE));return __guessBase;}
+export function figFileTokens(json){const out=[];const walk=(o,path,type)=>{if(!o||typeof o!=="object")return;const t=o.$type||type;
   if("$value" in o){out.push({name:path.join("/"),type:t,value:o.$value});return;}
   Object.keys(o).forEach(k=>{if(!k.startsWith("$"))walk(o[k],[...path,k],t);});};walk(json,[],undefined);return out;}
-function figFromFiles(list){/* list: [{name, json, coll, mode}] */
+export function figFromFiles(list){/* list: [{name, json, coll, mode}] */
   const out={vals:{},types:{},ids:{},colls:{},extra:0,source:"files"},model=figModel(BASE_FOR_GUESS());
   const T={color:"COLOR",number:"FLOAT",dimension:"FLOAT",fontWeight:"FLOAT",string:"STRING",fontFamily:"STRING",boolean:"BOOLEAN"};
   list.forEach(f=>{if(!f.coll||!f.mode)return;out.colls[f.coll]=out.colls[f.coll]||{modes:{}};out.colls[f.coll].modes[f.mode]=f.mode;
@@ -133,7 +135,7 @@ function figFromFiles(list){/* list: [{name, json, coll, mode}] */
 
 /* ---- writing Figma ---- */
 /* Token files for Figma's own variable import. One file per collection and mode. */
-function figFiles(st){
+export function figFiles(st){
   const model=figModel(st),files=[];
   FIG_COLLS.forEach(c=>figModes(c.id).forEach(mode=>{const root={$description:c.desc,$extensions:{[EXT]:{collection:c.name,mode}}};
     model.filter(e=>e.coll===c.id).forEach(e=>{const v=figNorm(e.type,e.get(st,mode));if(v===undefined)return;
@@ -147,7 +149,7 @@ function figFiles(st){
 /* Three-way compare. base is what both sides agreed on at the last sync.
    status: same, console (changed here), figma (changed in Figma), both (changed on both sides), new (not in Figma yet),
    gone (removed in Figma), extra (a color set color only in Figma), fixed (made by the console), bad (Figma's value does not fit). */
-function figCompare(st,remote,base,opt={}){
+export function figCompare(st,remote,base,opt={}){
   const rows=[],model=figModel(st),B=(base&&base.rows)||{},first=!base||!base.rows;
   model.forEach(e=>e.modes.forEach(mode=>{const rk=`${e.key}@@${mode}`,c=figNorm(e.type,e.get(st,mode)),f=remote.vals[rk],b=B[rk];
     const r={rk,key:e.key,coll:e.coll,name:e.name,mode,type:e.type,label:e.label(mode),c,f,b,canFigma:true,why:""};
@@ -183,14 +185,14 @@ function figCompare(st,remote,base,opt={}){
     rows.push(r);});
   return rows;}
 /* Picks a person cannot make are ignored, so a request cannot take a value the review did not offer. */
-function figCleanPicks(rows,picks){const out={};Object.entries(picks||{}).forEach(([rk,v])=>{const r=rows.find(x=>x.rk===rk);if(!r||!["console","figma","skip"].includes(v))return;
+export function figCleanPicks(rows,picks){const out={};Object.entries(picks||{}).forEach(([rk,v])=>{const r=rows.find(x=>x.rk===rk);if(!r||!["console","figma","skip"].includes(v))return;
   if(v==="figma"&&!r.canFigma)return;if(v==="console"&&r.canConsole===false)return;out[rk]=v;});return out;}
-function figTry(st,e,mode,v){const s=clone(st);try{return e.set?e.set(s,mode,v)||"":e.ro||"This cannot be changed from Figma.";}catch(err){return "This value does not fit here.";}}
-function figSummary(rows){const n=k=>rows.filter(r=>r.status===k).length;const diff=rows.filter(r=>r.status!=="same");
+export function figTry(st,e,mode,v){const s=clone(st);try{return e.set?e.set(s,mode,v)||"":e.ro||"This cannot be changed from Figma.";}catch(err){return "This value does not fit here.";}}
+export function figSummary(rows){const n=k=>rows.filter(r=>r.status===k).length;const diff=rows.filter(r=>r.status!=="same");
   return {total:rows.length,same:n("same"),diff:diff.length,toFigma:diff.filter(r=>r.pick==="console"&&r.status!=="type").length,toConsole:diff.filter(r=>r.pick==="figma").length,open:diff.filter(r=>r.pick===null).length,both:n("both")};}
 
 /* Applies the rows picked from Figma to a copy of the state. */
-function figApply(st,rows,picks){
+export function figApply(st,rows,picks){
   const s=clone(st),errors=[],model=figModel(st),byKey=Object.fromEntries(model.map(e=>[e.key,e]));
   const pickOf=r=>picks&&picks[r.rk]!==undefined?picks[r.rk]:r.pick;
   const changedMain=new Set(),wordRows=new Set();
@@ -211,7 +213,7 @@ function figApply(st,rows,picks){
 
 /* The body for POST /v1/files/:key/variables that makes Figma match the state.
    It creates missing collections, modes, and variables, updates values that differ, and removes color set colors picked for removal. */
-function figPushBody(st,remote,rows,picks){
+export function figPushBody(st,remote,rows,picks){
   const pickOf=r=>picks&&picks[r.rk]!==undefined?picks[r.rk]:r.pick;
   const skip=new Set(rows.filter(r=>pickOf(r)==="skip"||r.status==="type"||r.status==="alias"||r.alias).map(r=>r.rk));
   const body={variableCollections:[],variableModes:[],variables:[],variableModeValues:[]},collId={},modeId={},varId={};
@@ -234,11 +236,11 @@ function figPushBody(st,remote,rows,picks){
   return body;}
 /* After a sync with files: only rows that were uploaded, and whose Figma value is known to match, count as agreed.
    Values going to Figma count only after the next upload shows them in Figma. */
-function figBaseAfterFiles(prev,st,rows,picks){const pickOf=r=>picks&&picks[r.rk]!==undefined?picks[r.rk]:r.pick;const flat=figFlat(st),out={...((prev&&prev.rows)||{})};
+export function figBaseAfterFiles(prev,st,rows,picks){const pickOf=r=>picks&&picks[r.rk]!==undefined?picks[r.rk]:r.pick;const flat=figFlat(st),out={...((prev&&prev.rows)||{})};
   rows.forEach(r=>{if(r.status==="same"||(pickOf(r)==="figma"&&flat[r.rk]!==undefined&&figSame(r.type,flat[r.rk],r.f)))out[r.rk]=r.f;});
   return {rows:out};}
 /* What both sides agree on after a sync, so the next compare can tell who changed what. */
-function figBaseAfter(st,rows,picks){const pickOf=r=>picks&&picks[r.rk]!==undefined?picks[r.rk]:r.pick;const flat=figFlat(st),out={};
+export function figBaseAfter(st,rows,picks){const pickOf=r=>picks&&picks[r.rk]!==undefined?picks[r.rk]:r.pick;const flat=figFlat(st),out={};
   rows.forEach(r=>{const p=pickOf(r);if(p==="skip"||r.status==="type"){if(r.b!==undefined)out[r.rk]=r.b;return;}if(flat[r.rk]!==undefined)out[r.rk]=flat[r.rk];});
   Object.keys(flat).forEach(k=>{if(!(k in out)&&!rows.some(r=>r.rk===k&&(pickOf(r)==="skip"||r.status==="type")))out[k]=flat[k];});
   return {rows:out};}

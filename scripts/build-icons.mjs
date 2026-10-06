@@ -32,6 +32,6 @@ for (const [id, label, names] of CATS) {
   }
   cats.push([id, label, list]);
 }
-const js = `/* The approved icon set. Built from Lucide (ISC license) by scripts/build-icons.mjs. Do not edit by hand. */\nconst ICON_SET={name:"Lucide",version:${JSON.stringify(JSON.parse(fs.readFileSync("node_modules/lucide-react/package.json", "utf8")).version)},license:"ISC"};\nconst ICON_CATS=${JSON.stringify(cats)};\nconst ICONS=${JSON.stringify(out)};\n`;
+const js = `/* The approved icon set. Built from Lucide (ISC license) by scripts/build-icons.mjs. Do not edit by hand. */\nexport const ICON_SET={name:"Lucide",version:${JSON.stringify(JSON.parse(fs.readFileSync("node_modules/lucide-react/package.json", "utf8")).version)},license:"ISC"};\nexport const ICON_CATS=${JSON.stringify(cats)};\nexport const ICONS=${JSON.stringify(out)};\n`;
 fs.writeFileSync("console/icons.js", js);
 console.log(`Wrote console/icons.js with ${Object.keys(out).length} icons in ${cats.length} groups.`, missing.length ? "Missing: " + missing.join(", ") : "");

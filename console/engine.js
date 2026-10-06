@@ -1,48 +1,47 @@
 /* Design system engine: color math, token resolution, checks, outputs.
    Loaded by the console in the browser and by the server and build in Node. */
+import { BRANDS, BN, RADII, esc, rad, shadow } from "./basics.js";
+import { ICONS, ICON_CATS, ICON_SET } from "./icons.js";
+import { CATN, REG, REG_ORDER, compVars, slotOf } from "./registry.js";
 /* =====================================================================
    COLOR MATH (OKLCH, WCAG contrast)
    ===================================================================== */
-const INK="#1C1A17";
-function hexOk(h){return /^#?[0-9a-f]{6}$/i.test(String(h||"").trim());}
-function normHex(h){h=String(h).trim(); if(h[0]!=="#") h="#"+h; return h.toUpperCase();}
-function hexToRgb(h){h=h.replace("#","");if(h.length===3)h=h.split("").map(x=>x+x).join("");const n=parseInt(h,16);return [(n>>16)&255,(n>>8)&255,n&255];}
-function rgbToHex(a){return "#"+a.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,"0")).join("").toUpperCase();}
-const lin=c=>{c/=255;return c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2.4)};
-const delin=c=>255*(c<=0.0031308?12.92*c:1.055*Math.pow(c,1/2.4)-0.055);
-function toOklch(hex){const [r,g,b]=hexToRgb(hex).map(lin);
+export const INK="#1C1A17";
+export function hexOk(h){return /^#?[0-9a-f]{6}$/i.test(String(h||"").trim());}
+export function normHex(h){h=String(h).trim(); if(h[0]!=="#") h="#"+h; return h.toUpperCase();}
+export function hexToRgb(h){h=h.replace("#","");if(h.length===3)h=h.split("").map(x=>x+x).join("");const n=parseInt(h,16);return [(n>>16)&255,(n>>8)&255,n&255];}
+export function rgbToHex(a){return "#"+a.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,"0")).join("").toUpperCase();}
+export const lin=c=>{c/=255;return c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2.4)};
+export const delin=c=>255*(c<=0.0031308?12.92*c:1.055*Math.pow(c,1/2.4)-0.055);
+export function toOklch(hex){const [r,g,b]=hexToRgb(hex).map(lin);
   const l=Math.cbrt(0.4122214708*r+0.5363325363*g+0.0514459929*b), m=Math.cbrt(0.2119034982*r+0.6806995451*g+0.1073969566*b), s=Math.cbrt(0.0883024619*r+0.2817188376*g+0.6299787005*b);
   const L=0.2104542553*l+0.7936177850*m-0.0040720468*s, A=1.9779984951*l-2.4285922050*m+0.4505937099*s, B=0.0259040371*l+0.7827717662*m-0.8086757660*s;
   return [L,Math.hypot(A,B),(Math.atan2(B,A)*180/Math.PI+360)%360];}
-function rawRgb(L,C,H){const a=C*Math.cos(H*Math.PI/180), b=C*Math.sin(H*Math.PI/180);
+export function rawRgb(L,C,H){const a=C*Math.cos(H*Math.PI/180), b=C*Math.sin(H*Math.PI/180);
   const l=(L+0.3963377774*a+0.2158037573*b)**3, m=(L-0.1055613458*a-0.0638541728*b)**3, s=(L-0.0894841775*a-1.2914855480*b)**3;
   return [4.0767416621*l-3.3077115913*m+0.2309699292*s,-1.2684380046*l+2.6097574011*m-0.3413193965*s,-0.0041960863*l-0.7034186147*m+1.7076147010*s];}
-function fromOklch(L,C,H){L=Math.max(0,Math.min(1,L));let c=C;
+export function fromOklch(L,C,H){L=Math.max(0,Math.min(1,L));let c=C;
   for(let i=0;i<40;i++){const r=rawRgb(L,c,H); if(r.every(v=>v>=-0.0005&&v<=1.0005)) return rgbToHex(r.map(v=>delin(Math.min(1,Math.max(0,v))))); c*=0.92;}
   return rgbToHex(rawRgb(L,0,H).map(v=>delin(Math.min(1,Math.max(0,v)))));}
-function lum(hex){const [r,g,b]=hexToRgb(hex).map(lin);return 0.2126*r+0.7152*g+0.0722*b;}
-function contrast(a,b){const x=lum(a),y=lum(b);return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05);}
-const STEPS=[[50,.975,.14],[100,.945,.28],[200,.89,.5],[300,.81,.75],[400,.72,.95],[500,.63,1],[600,.54,1],[700,.46,.95],[800,.38,.85],[900,.29,.7],[950,.2,.55]];
-function scaleOf(hex){const [L,C,H]=toOklch(hex);const o={};STEPS.forEach(([k,l,f])=>{o[k]=fromOklch(l,Math.max(C*f,0.004),H)});
+export function lum(hex){const [r,g,b]=hexToRgb(hex).map(lin);return 0.2126*r+0.7152*g+0.0722*b;}
+export function contrast(a,b){const x=lum(a),y=lum(b);return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05);}
+export const STEPS=[[50,.975,.14],[100,.945,.28],[200,.89,.5],[300,.81,.75],[400,.72,.95],[500,.63,1],[600,.54,1],[700,.46,.95],[800,.38,.85],[900,.29,.7],[950,.2,.55]];
+export function scaleOf(hex){const [L,C,H]=toOklch(hex);const o={};STEPS.forEach(([k,l,f])=>{o[k]=fromOklch(l,Math.max(C*f,0.004),H)});
   let near=500,d=9;STEPS.forEach(([k,l])=>{if(Math.abs(l-L)<d){d=Math.abs(l-L);near=k}});o.base=near;return o;}
-function shift(hex,dL,dH=0,cMul=1){const [L,C,H]=toOklch(hex);return fromOklch(L+dL,C*cMul,(H+dH+360)%360);}
-function darkenTo(hex,against,target){let h=hex;for(let i=0;i<40&&contrast(h,against)<target;i++) h=shift(h,-0.015);return h;}
-function lightenTo(hex,against,target){let h=hex;for(let i=0;i<60&&contrast(h,against)<target;i++) h=shift(h,0.012);return h;}
-function autoOn(bg){const cw=contrast("#FFFFFF",bg), cd=contrast(INK,bg); return cw>=4.5||cw>=cd?"#FFFFFF":INK;}
-const fmt=r=>(Math.floor(r*10)/10).toFixed(1);
+export function shift(hex,dL,dH=0,cMul=1){const [L,C,H]=toOklch(hex);return fromOklch(L+dL,C*cMul,(H+dH+360)%360);}
+export function darkenTo(hex,against,target){let h=hex;for(let i=0;i<40&&contrast(h,against)<target;i++) h=shift(h,-0.015);return h;}
+export function lightenTo(hex,against,target){let h=hex;for(let i=0;i<60&&contrast(h,against)<target;i++) h=shift(h,0.012);return h;}
+export function autoOn(bg){const cw=contrast("#FFFFFF",bg), cd=contrast(INK,bg); return cw>=4.5||cw>=cd?"#FFFFFF":INK;}
+export const fmt=r=>(Math.floor(r*10)/10).toFixed(1);
 
 /* =====================================================================
    DESIGN DATA
    ===================================================================== */
-const BRANDS=[
-  {id:"northfield",name:"Northfield",div:"Consumer division"},
-  {id:"crestline",name:"Crestline",div:"Partner division"}];
-const BN=Object.fromEntries(BRANDS.map(b=>[b.id,b.name]));
 /* The font library. The free fonts load from Google Fonts.
    Licensed fonts need your company's font files. Until those are added, a free look-alike shows instead.
    role: "best" = easiest to read for older readers, "body" = fine for reading, "heading" = headings only, "label" = short labels and numbers only. */
-const SANS="system-ui,-apple-system,'Segoe UI',sans-serif", SERIF="Georgia,'Times New Roman',serif", MONO="ui-monospace,'SF Mono',Menlo,monospace";
-const FONT_LIST=[
+export const SANS="system-ui,-apple-system,'Segoe UI',sans-serif", SERIF="Georgia,'Times New Roman',serif", MONO="ui-monospace,'SF Mono',Menlo,monospace";
+export const FONT_LIST=[
   {name:"Atkinson Hyperlegible",cat:"sans",role:"best",axes:"ital,wght@0,400;0,700;1,400;1,700",note:"Made by the Braille Institute. Letters that look alike, like I, l, and 1, are easy to tell apart."},
   {name:"Public Sans",cat:"sans",role:"best",axes:"ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,700",note:"A plain, sturdy font made for government websites."},
   {name:"Source Sans 3",cat:"sans",role:"best",axes:"ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,700",note:"A friendly font that stays clear at small sizes."},
@@ -52,36 +51,35 @@ const FONT_LIST=[
   {name:"Cormorant Garamond",cat:"serif",role:"heading",axes:"ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700",note:"An elegant serif font with a beautiful italic. Its letters are small and fine, so use it only for large headings."},
   {name:"Avenir Next Mono",cat:"mono",role:"label",licensed:true,standIn:"DM Mono",weights:"400;500",note:"The fixed-width partner of Avenir Next. Use it for small labels, codes, and numbers, not sentences. It needs a license."}];
 /* Free look-alikes for licensed fonts. They are not shown in the picker. */
-const STAND_INS={"Nunito Sans":{cat:"sans",axes:"ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,700"},"DM Mono":{cat:"mono",axes:"wght@400;500"}};
-const FONT_CATS={sans:"Plain (sans serif)",serif:"Serif",mono:"Fixed width"};
-const FALLBACK={sans:SANS,serif:SERIF,mono:MONO};
+export const STAND_INS={"Nunito Sans":{cat:"sans",axes:"ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,700"},"DM Mono":{cat:"mono",axes:"wght@400;500"}};
+export const FONT_CATS={sans:"Plain (sans serif)",serif:"Serif",mono:"Fixed width"};
+export const FALLBACK={sans:SANS,serif:SERIF,mono:MONO};
 /* hosted: the company's own font files are added, so no free look-alike or Google Fonts link is needed. */
-function fontEntry(f){const hosted=!!f.hosted, stack=[`'${f.name}'`,...(f.standIn&&!hosted?[`'${f.standIn}'`]:[]),FALLBACK[f.cat]||SANS].join(",");
+export function fontEntry(f){const hosted=!!f.hosted, stack=[`'${f.name}'`,...(f.standIn&&!hosted?[`'${f.standIn}'`]:[]),FALLBACK[f.cat]||SANS].join(",");
   const ax=f.axes||(f.standIn&&STAND_INS[f.standIn]?STAND_INS[f.standIn].axes:"wght@400;700"), weights=f.weights||ax.replace(/^.*@/,"").split(";").filter(x=>!x.startsWith("1,")).map(x=>x.replace(/^0,/,"")).join(";");
   return {...f,cat:FALLBACK[f.cat]?f.cat:"sans",role:["best","body","heading","label"].includes(f.role)?f.role:"body",stack,weights,italic:f.italic??/ital/.test(ax)};}
-const FONTS=Object.fromEntries(FONT_LIST.map(f=>[f.name,fontEntry(f)]));
+export const FONTS=Object.fromEntries(FONT_LIST.map(f=>[f.name,fontEntry(f)]));
 /* Fonts the brand team added. st.fontLib = {added:[{name,cat,role,source:"google"|"upload",axes}], removed:[names], files:{family:[{file,weight,style}]}}.
    Added fonts are kept in FONTS even after they are removed, so older versions still show correctly. */
-function fontLibOf(st){const L=(st&&st.fontLib)||{};return {added:Array.isArray(L.added)?L.added.filter(f=>f&&typeof f.name==="string"&&f.name.trim()):[],removed:Array.isArray(L.removed)?L.removed.filter(n=>typeof n==="string"):[],files:L.files&&typeof L.files==="object"?L.files:{}};}
-function registerFonts(st){const L=fontLibOf(st);
+export function fontLibOf(st){const L=(st&&st.fontLib)||{};return {added:Array.isArray(L.added)?L.added.filter(f=>f&&typeof f.name==="string"&&f.name.trim()):[],removed:Array.isArray(L.removed)?L.removed.filter(n=>typeof n==="string"):[],files:L.files&&typeof L.files==="object"?L.files:{}};}
+export function registerFonts(st){const L=fontLibOf(st);
   L.added.forEach(f=>{FONTS[f.name]=fontEntry({...f,added:true,hosted:f.source==="upload"||!!(L.files[f.name]||[]).length});});
   Object.entries(L.files).forEach(([n,list])=>{const base=FONT_LIST.find(x=>x.name===n);if(base&&Array.isArray(list)&&list.length) FONTS[n]=fontEntry({...base,hosted:true});});}
 /* The fonts the picker shows for a state, in order. */
-function fontsShown(st){const L=fontLibOf(st);return [...FONT_LIST.map(f=>f.name).filter(n=>!L.removed.includes(n)),...L.added.map(f=>f.name).filter(n=>!L.removed.includes(n))].filter((n,i,a)=>FONTS[n]&&a.indexOf(n)===i);}
-const FONT_FORMATS={woff2:"woff2",woff:"woff",ttf:"truetype",otf:"opentype"};
+export function fontsShown(st){const L=fontLibOf(st);return [...FONT_LIST.map(f=>f.name).filter(n=>!L.removed.includes(n)),...L.added.map(f=>f.name).filter(n=>!L.removed.includes(n))].filter((n,i,a)=>FONTS[n]&&a.indexOf(n)===i);}
+export const FONT_FORMATS={woff2:"woff2",woff:"woff",ttf:"truetype",otf:"opentype"};
 /* @font-face rules for the company's own font files. base is where the fonts folder is, like "./" or "/". */
-function fontFaceCss(st,base){const L=fontLibOf(st),out=[];
+export function fontFaceCss(st,base){const L=fontLibOf(st),out=[];
   Object.entries(L.files).forEach(([n,list])=>(list||[]).forEach(x=>{if(!x||typeof x.file!=="string")return;const ext=(x.file.split(".").pop()||"").toLowerCase();
     out.push(`@font-face { font-family: '${n.replace(/'/g,"")}'; src: url("${(x.url||base+x.file).replace(/"/g,"")}") format("${FONT_FORMATS[ext]||"woff2"}"); font-weight: ${Number(x.weight)||400}; font-style: ${x.style==="italic"?"italic":"normal"}; font-display: swap; }`);}));
   return out.join("\n");}
-function fontHref(names){const fams=[...new Set(names.filter(n=>FONTS[n]&&!FONTS[n].hosted).map(n=>FONTS[n].licensed?FONTS[n].standIn:n))];
+export function fontHref(names){const fams=[...new Set(names.filter(n=>FONTS[n]&&!FONTS[n].hosted).map(n=>FONTS[n].licensed?FONTS[n].standIn:n))];
   const u=fams.map(n=>`family=${n.replace(/ /g,"+")}${(FONTS[n]&&!FONTS[n].licensed?FONTS[n].axes:STAND_INS[n]?STAND_INS[n].axes:"")?":"+(FONTS[n]&&!FONTS[n].licensed?FONTS[n].axes:STAND_INS[n].axes):""}`);
   return u.length?`https://fonts.googleapis.com/css2?${u.join("&")}&display=swap`:"";}
-function uiFont(st){return FONTS[st.type.ui]?st.type.ui:st.type.body;}
-const RADII={none:"No corners",sm:"Small",md:"Medium",lg:"Large",pill:"Round ends"};
-const ROLE_LABEL={"action.primary":"Main brand color","highlight":"Second brand color","ink":"Dark text color","border.strong":"Strong border (gray 500)","border.default":"Light border (gray 200)"};
+export function uiFont(st){return FONTS[st.type.ui]?st.type.ui:st.type.body;}
+export const ROLE_LABEL={"action.primary":"Main brand color","highlight":"Second brand color","ink":"Dark text color","border.strong":"Strong border (gray 500)","border.default":"Light border (gray 200)"};
 
-const BASE={
+export const BASE={
   version:"1.4.0",
   gray:"warm",
   brands:{
@@ -104,11 +102,9 @@ const BASE={
     card:"Use a card to group things that belong together, like one account or one order. Do not put a card inside another card. Keep one main action per card.",
     dialog:"Only use a pop-up when the person must decide something before going on, like confirming a delete. The title asks the question. The main button repeats the action, like \"Delete this address,\" not \"OK.\""}
 };
-function clone(o){return JSON.parse(JSON.stringify(o));}
-/* Makes text safe to put inside HTML. */
-function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+export function clone(o){return JSON.parse(JSON.stringify(o));}
 /* Official brand color sets, taken from the brand color wheels. Order and share keep the brand's hierarchy. */
-const PALETTES={
+export const PALETTES={
   crestline:{groups:[
     {id:"signature",name:"Signature color combination",note:"These three colors together are what people should know as Crestline.",colors:[
       {name:"Royal blue",hex:"#1A3DA3",share:30},{name:"Sky blue",hex:"#4AA1CC",shade:"#4193B8",share:17},{name:"Leaf green",hex:"#8ABC3F",shade:"#6A9835",share:12}]},
@@ -126,43 +122,41 @@ const PALETTES={
 /* =====================================================================
    TOKEN RESOLUTION: brand x context x size -> values
    ===================================================================== */
-const NEUTRAL=scaleOf("#77716A");
+export const NEUTRAL=scaleOf("#77716A");
 /* Gray color, like Radix "grayColor": grays can be warm, pure, cool, or tinted with the brand's main color. */
-const GRAYS={warm:"#77716A",neutral:"#737373",cool:"#6B717C"};
-function grayOf(st,b){const g=st.gray||"warm";if(g==="brand"){const [,C,H]=toOklch(st.brands[b].primary);return scaleOf(fromOklch(.56,Math.min(C,.1)*.18+.004,H));}return scaleOf(GRAYS[g]||GRAYS.warm);}
-const PAGE="#FAF9F7";
-function rad(st,key){const r=st.shape.radius;return {none:0,sm:Math.min(4,r),md:r,lg:Math.round(r*1.5),pill:999}[key];}
-function shadow(k){return {none:"none",soft:"0 1px 2px rgba(20,18,16,.06), 0 4px 14px rgba(20,18,16,.07)",strong:"0 2px 4px rgba(20,18,16,.08), 0 14px 32px rgba(20,18,16,.14)"}[k];}
+export const GRAYS={warm:"#77716A",neutral:"#737373",cool:"#6B717C"};
+export function grayOf(st,b){const g=st.gray||"warm";if(g==="brand"){const [,C,H]=toOklch(st.brands[b].primary);return scaleOf(fromOklch(.56,Math.min(C,.1)*.18+.004,H));}return scaleOf(GRAYS[g]||GRAYS.warm);}
+export const PAGE="#FAF9F7";
 /* Page and window backgrounds, per brand and mode. Picked from the brand's color set. */
-const BG_KEYS={light:{page:"lightPage",card:"lightCard"},dark:{page:"darkPage",card:"darkCard"}};
-function bgDefault(br,mode,which){
+export const BG_KEYS={light:{page:"lightPage",card:"lightCard"},dark:{page:"darkPage",card:"darkCard"}};
+export function bgDefault(br,mode,which){
   if(mode==="light") return "#FFFFFF";
   const seeds=br.seeds||{};
   return which==="page"?scaleOf(seeds.primary||br.primary)[950]:scaleOf(seeds.secondary||br.secondary)[900];
 }
-function bgSeedDefault(br,mode,which){const seeds=br.seeds||{};if(mode==="light") return "#FFFFFF";return which==="page"?(seeds.primary||br.primary):(seeds.secondary||br.secondary);}
-function bgChosen(br,mode,which){return !!(br.bg&&br.bg[mode]&&br.bg[mode][which]);}
-function bgOf(br,mode,which){return bgChosen(br,mode,which)?br.bg[mode][which]:bgDefault(br,mode,which);}
+export function bgSeedDefault(br,mode,which){const seeds=br.seeds||{};if(mode==="light") return "#FFFFFF";return which==="page"?(seeds.primary||br.primary):(seeds.secondary||br.secondary);}
+export function bgChosen(br,mode,which){return !!(br.bg&&br.bg[mode]&&br.bg[mode][which]);}
+export function bgOf(br,mode,which){return bgChosen(br,mode,which)?br.bg[mode][which]:bgDefault(br,mode,which);}
 /* Page look: a flat color, a gradient, or a picture, plus see-through windows (like Radix "translucent" panels). */
-const LOOK_DEF={kind:"solid",to:null,angle:"down",veil:0.8,glass:1,blur:0};
-const ANGLES={down:"180deg",diag:"135deg",side:"90deg"};
+export const LOOK_DEF={kind:"solid",to:null,angle:"down",veil:0.8,glass:1,blur:0};
+export const ANGLES={down:"180deg",diag:"135deg",side:"90deg"};
 /* Contrast goal for words. "rule" meets WCAG AA (4.5 to 1). "best" aims for 7 to 1, which is better for older readers. */
-function goalOf(br){return br&&br.wordGoal==="best"?7.05:4.6;}
-function lookOf(br,mode){return Object.assign({},LOOK_DEF,(br&&br.look&&br.look[mode])||{});}
-function mixHex(a,b,t){const x=hexToRgb(a),y=hexToRgb(b);return rgbToHex(x.map((v,i)=>v*t+y[i]*(1-t)));}
-function hexA(h,a){const [r,g,b]=hexToRgb(h);return a>=1?normHex(h):`rgba(${r}, ${g}, ${b}, ${+a.toFixed(2)})`;}
+export function goalOf(br){return br&&br.wordGoal==="best"?7.05:4.6;}
+export function lookOf(br,mode){return Object.assign({},LOOK_DEF,(br&&br.look&&br.look[mode])||{});}
+export function mixHex(a,b,t){const x=hexToRgb(a),y=hexToRgb(b);return rgbToHex(x.map((v,i)=>v*t+y[i]*(1-t)));}
+export function hexA(h,a){const [r,g,b]=hexToRgb(h);return a>=1?normHex(h):`rgba(${r}, ${g}, ${b}, ${+a.toFixed(2)})`;}
 /* Every color the page can show behind words. Checks test words against all of them. */
-function pageSet(br,mode){const L=lookOf(br,mode),p=bgOf(br,mode,"page");
+export function pageSet(br,mode){const L=lookOf(br,mode),p=bgOf(br,mode,"page");
   if(L.kind==="gradient"&&L.to) return [p,normHex(L.to),mixHex(p,L.to,.5)];
   if(L.kind==="image"&&L.img&&(L.samples||[]).length) return L.samples.map(x=>mixHex(p,x,L.veil));
   return [p];}
-function cardSet(br,mode){const L=lookOf(br,mode),c=bgOf(br,mode,"card");return L.glass>=1?[c]:pageSet(br,mode).map(x=>mixHex(c,x,L.glass));}
-function pageFill(br,mode){const L=lookOf(br,mode),p=bgOf(br,mode,"page");
+export function cardSet(br,mode){const L=lookOf(br,mode),c=bgOf(br,mode,"card");return L.glass>=1?[c]:pageSet(br,mode).map(x=>mixHex(c,x,L.glass));}
+export function pageFill(br,mode){const L=lookOf(br,mode),p=bgOf(br,mode,"page");
   if(L.kind==="gradient"&&L.to) return L.angle==="glow"?`radial-gradient(120% 90% at 50% 0%, ${normHex(L.to)}, ${p} 75%)`:`linear-gradient(${ANGLES[L.angle]||"180deg"}, ${p}, ${normHex(L.to)})`;
   if(L.kind==="image"&&L.img){const v=hexA(p,L.veil);return `linear-gradient(${v}, ${v}), url('${L.img}')`;}
   return "none";}
-function bgSeedOf(br,mode,which){const sk=BG_KEYS[mode][which];return (bgChosen(br,mode,which)&&br.seeds&&br.seeds[sk])||bgSeedDefault(br,mode,which);}
-function roleColor(st,b,role){const br=st.brands[b];
+export function bgSeedOf(br,mode,which){const sk=BG_KEYS[mode][which];return (bgChosen(br,mode,which)&&br.seeds&&br.seeds[sk])||bgSeedDefault(br,mode,which);}
+export function roleColor(st,b,role){const br=st.brands[b];
   if(role==="action.primary") return br.primary;
   if(role==="highlight") return br.secondary;
   if(role==="ink") return INK;
@@ -170,19 +164,19 @@ function roleColor(st,b,role){const br=st.brands[b];
   if(role==="border.default") return grayOf(st,b)[200];
   return br.primary;}
 /* Dark mode: warm near-black neutrals. Brand colors are lifted until they stand out on the dark page. */
-const DK={bg:"#141312",card:"#1D1C1A",muted:"#2A2826",border:"#3D3A36",input:"#827C73",fg:"#EEEBE5",mutedFg:"#B3ACA1"};
+export const DK={bg:"#141312",card:"#1D1C1A",muted:"#2A2826",border:"#3D3A36",input:"#827C73",fg:"#EEEBE5",mutedFg:"#B3ACA1"};
 /* Words on the main color follow the brand team's choice in every mode. */
-function wordOn(br){return br.onPrimary==="white"?"#FFFFFF":br.onPrimary==="dark"?INK:hexOk(br.onPrimary)?normHex(br.onPrimary):autoOn(br.primary);}
+export function wordOn(br){return br.onPrimary==="white"?"#FFFFFF":br.onPrimary==="dark"?INK:hexOk(br.onPrimary)?normHex(br.onPrimary):autoOn(br.primary);}
 /* Word and background colors the brand team picked by hand for one mode. Anything not picked is made automatically. */
-const PAIR_KEYS=["link","body","tag","tagBg","soft","softBg"];
-function pairsOf(br,mode){const o=(br&&br.pairs&&br.pairs[mode])||{};return Object.fromEntries(PAIR_KEYS.filter(k=>hexOk(o[k])).map(k=>[k,normHex(o[k])]));}
+export const PAIR_KEYS=["link","body","tag","tagBg","soft","softBg"];
+export function pairsOf(br,mode){const o=(br&&br.pairs&&br.pairs[mode])||{};return Object.fromEntries(PAIR_KEYS.filter(k=>hexOk(o[k])).map(k=>[k,normHex(o[k])]));}
 /* An edge color for a filled shape, so it stands out from the page and window (3 to 1). */
 /* Make a color darker (light mode) or lighter (dark mode) until it passes on every background in the list. */
-function dropAll(x,list,t){for(let i=0;i<3;i++)list.forEach(b=>{if(contrast(x,b)<t)x=darkenTo(x,b,t);});return x;}
-function liftAll(x,list,t){for(let i=0;i<3;i++)list.forEach(b=>{if(contrast(x,b)<t)x=lightenTo(x,b,t);});return x;}
-function edgeFor(fill,bg,card,dark){const list=[].concat(bg,card);return dark?liftAll(fill,list,3.1):dropAll(fill,list,3.1);}
-function lightRole(st,b,r){const br=st.brands[b];return r==="highlight"?br.secondary:r==="ink"?INK:br.primary;}
-function colorsDark(st,b){
+export function dropAll(x,list,t){for(let i=0;i<3;i++)list.forEach(b=>{if(contrast(x,b)<t)x=darkenTo(x,b,t);});return x;}
+export function liftAll(x,list,t){for(let i=0;i<3;i++)list.forEach(b=>{if(contrast(x,b)<t)x=lightenTo(x,b,t);});return x;}
+export function edgeFor(fill,bg,card,dark){const list=[].concat(bg,card);return dark?liftAll(fill,list,3.1):dropAll(fill,list,3.1);}
+export function lightRole(st,b,r){const br=st.brands[b];return r==="highlight"?br.secondary:r==="ink"?INK:br.primary;}
+export function colorsDark(st,b){
   const br=st.brands[b], P0=br.primary, sc=scaleOf(P0), sc2=scaleOf(br.secondary), sys=st.system;
   const bg=bgOf(br,"dark","page"), card=bgOf(br,"dark","card"), pS=pageSet(br,"dark"), cS=cardSet(br,"dark"), LK=lookOf(br,"dark");
   const [Lc,Cc,Hc]=toOklch(card);
@@ -209,7 +203,7 @@ function colorsDark(st,b){
     secondary:soft,secondaryFg:PR.soft||liftAll(sc[200],[soft,muted],7),accent:acc,accentFg:PR.tag||lightenTo(sc2[200],acc,Math.max(7,GL)),accentBrand:br.accent,
     danger:sys.danger,dangerFg:autoOn(sys.danger),dangerText:dg,dangerSoft:dgs,success:sg,successSoft:sgs,warning:wg,warningSoft:wgs};
 }
-function colorsFor(st,b,mode){
+export function colorsFor(st,b,mode){
   if(mode==="dark") return colorsDark(st,b);
   const br=st.brands[b], P=br.primary, sc=scaleOf(P), sc2=scaleOf(br.secondary), sca=scaleOf(br.accent);
   const onP = wordOn(br);
@@ -236,7 +230,7 @@ function colorsFor(st,b,mode){
     danger:sys.danger,dangerFg:autoOn(sys.danger),dangerText:dropAll(sys.danger,[page,card,...onAll,ds],GL),dangerSoft:ds,
     success:okText,successSoft:ss,warning:warnText,warningSoft:ws};
 }
-function sizesFor(st,ctx,size){
+export function sizesFor(st,ctx,size){
   const d=st.density[ctx], big=size==="large", r=st.type.scale;
   const base=Math.round(d.base*(big?1.125:1));
   return {base,control:Math.round(d.control*(big?7/6:1)),gap:Math.round(d.gap*(big?1.25:1)),pad:Math.round(d.pad*(big?1.17:1)),
@@ -245,8 +239,8 @@ function sizesFor(st,ctx,size){
 /* =====================================================================
    CHECKS (the safeguards that let the brand team publish on their own)
    ===================================================================== */
-const CTX=["consumer","employee"], SZ=["standard","large"];
-function runChecks(st){
+export const CTX=["consumer","employee"], SZ=["standard","large"];
+export function runChecks(st){
   const out=[];
   const add=(o)=>out.push(o);
   BRANDS.forEach(B=>{
@@ -318,17 +312,17 @@ function runChecks(st){
   return out;
 }
 /* When the main color changes, keep its words readable. Returns the word setting to switch to, or null. */
-function wordsForNewMain(br){const P=br.primary, cur=wordOn(br);if(contrast(cur,P)>=4.5) return null;
+export function wordsForNewMain(br){const P=br.primary, cur=wordOn(br);if(contrast(cur,P)>=4.5) return null;
   const w=contrast("#FFFFFF",P), d=contrast(INK,P);if(Math.max(w,d)<4.5) return null;return w>=d?"white":"dark";}
 /* The smallest change that makes the main button words reach a goal. Keeps the color if the other word color works. */
-function buttonFix(st,b,goal,want){const br=st.brands[b],P=br.primary,cur=wordOn(br);
+export function buttonFix(st,b,goal,want){const br=st.brands[b],P=br.primary,cur=wordOn(br);
   for(const [w,k] of [["#FFFFFF","white"],[INK,"dark"]]){if((!want||want===k)&&w!==cur&&contrast(w,P)>=goal) return [{path:`brands.${b}.onPrimary`,value:k,why:`Your color stays the same. ${k==="white"?"White":"Dark"} words on it reach ${fmt(contrast(w,P))} to 1.`}];}
   const seed=(br.seeds&&br.seeds.primary)||P, sc=scaleOf(seed), [L0]=toOklch(P);
   const opts=STEPS.map(([k])=>sc[k]).flatMap(x=>[["#FFFFFF","white",x],[INK,"dark",x]]).filter(([w,k,x])=>(!want||want===k)&&contrast(w,x)>=goal).sort((a,b)=>Math.abs(toOklch(a[2])[0]-L0)-Math.abs(toOklch(b[2])[0]-L0));
   if(!opts.length) return [];
   const [w,k,x]=opts[0], step=STEPS.find(([s])=>sc[s]===x)[0];
   return [{path:`brands.${b}.primary`,value:x,why:`Shade ${step} of your main color. ${k==="white"?"White":"Dark"} words on it reach ${fmt(contrast(w,x))} to 1. This changes the main color everywhere.`},...(k!==br.onPrimary?[{path:`brands.${b}.onPrimary`,value:k,why:`${k==="white"?"White":"Dark"} words on the new shade.`}]:[])];}
-function fixChanges(st,fix){
+export function fixChanges(st,fix){
   if(fix.kind==="btn7") return buttonFix(st,fix.brand,7);
   if(fix.kind==="btnbg"){const br=st.brands[fix.brand];
     if(st.comp.button.bg==="highlight"){const S2=br.secondary,[L]=toOklch(S2),sc=scaleOf(S2);
@@ -361,12 +355,12 @@ function fixChanges(st,fix){
 /* =====================================================================
    PATHS, LABELS, DIFF
    ===================================================================== */
-function getP(o,p){return p.split(".").reduce((a,k)=>a==null?a:a[k],o);}
-function setP(o,p,v){const ks=p.split(".");let a=o;for(let i=0;i<ks.length-1;i++){if(a[ks[i]]==null||typeof a[ks[i]]!=="object")a[ks[i]]={};a=a[ks[i]];}a[ks[ks.length-1]]=v;}
-function flat(o,pre="",out={}){for(const k in o){const v=o[k],p=pre?pre+"."+k:k;if(v&&typeof v==="object")flat(v,p,out);else out[p]=v;}return out;}
-const SLOT={primary:"main color",secondary:"second color",accent:"accent color",onPrimary:"words on the main color"};
-const CNAME={button:"Button",field:"Text field",select:"Select",card:"Card",dialog:"Pop-up (dialog)"};
-function labelFor(p){const k=p.split(".");
+export function getP(o,p){return p.split(".").reduce((a,k)=>a==null?a:a[k],o);}
+export function setP(o,p,v){const ks=p.split(".");let a=o;for(let i=0;i<ks.length-1;i++){if(a[ks[i]]==null||typeof a[ks[i]]!=="object")a[ks[i]]={};a=a[ks[i]];}a[ks[ks.length-1]]=v;}
+export function flat(o,pre="",out={}){for(const k in o){const v=o[k],p=pre?pre+"."+k:k;if(v&&typeof v==="object")flat(v,p,out);else out[p]=v;}return out;}
+export const SLOT={primary:"main color",secondary:"second color",accent:"accent color",onPrimary:"words on the main color"};
+export const CNAME={button:"Button",field:"Text field",select:"Select",card:"Card",dialog:"Pop-up (dialog)"};
+export function labelFor(p){const k=p.split(".");
   if(k[0]==="brands"&&k[2]==="palette"){if(k.length>3){const c=typeof S!=="undefined"?getP(S.draft,k.slice(0,-1).join(".")):null;return `${BN[k[1]]} ${c&&c.name?c.name:"color"}`;}return `${BN[k[1]]} color set`;}
   if(k[0]==="brands"&&k[2]==="bg") return `${BN[k[1]]} ${k[3]} mode ${k[4]==="page"?"page background":"window and card background"}`;
   if(k[0]==="brands"&&k[2]==="seeds"&&/^(light|dark)(Page|Card)$/.test(k[3])) return `${BN[k[1]]} ${k[3].replace(/(Page|Card)$/,"")} mode ${/Page$/.test(k[3])?"page background":"window background"} shade range`;
@@ -384,11 +378,11 @@ function labelFor(p){const k=p.split(".");
   if(k[0]==="comp"){const sl=slotOf(k[1],k[2]);return `${REG[k[1]]?REG[k[1]].name:k[1]}: ${sl?sl.label.toLowerCase():k[2]}`;}
   if(k[0]==="guidance") return `AI guidance for ${REG[k[1]]?REG[k[1]].name:k[1]}`;
   return p;}
-function fontLibSummary(L){const x=fontLibOf({fontLib:L}),files=Object.values(x.files).reduce((a,l)=>a+(l||[]).length,0);
+export function fontLibSummary(L){const x=fontLibOf({fontLib:L}),files=Object.values(x.files).reduce((a,l)=>a+(l||[]).length,0);
   const parts=[x.added.length?`${x.added.length} added font${x.added.length>1?"s":""}`:"",x.removed.length?`${x.removed.length} hidden`:"",files?`${files} font file${files>1?"s":""}`:""].filter(Boolean);
   return parts.length?parts.join(", "):"The standard fonts";}
-function palSummary(p){if(!p)return "No color set";const n=p.groups.reduce((a,g)=>a+g.colors.length,0);return `${n} colors in ${p.groups.length} groups`;}
-function diff(a,b){const fa=flat(a),fb=flat(b),out=[],seen=new Set();
+export function palSummary(p){if(!p)return "No color set";const n=p.groups.reduce((a,g)=>a+g.colors.length,0);return `${n} colors in ${p.groups.length} groups`;}
+export function diff(a,b){const fa=flat(a),fb=flat(b),out=[],seen=new Set();
   new Set([...Object.keys(fa),...Object.keys(fb)]).forEach(k=>{if(k==="version"||fa[k]===fb[k])return;
     const m=k.match(/^brands\.(\w+)\.palette\./);
     if(m){const pp=`brands.${m[1]}.palette`;if(seen.has(pp))return;seen.add(pp);out.push({path:pp,from:palSummary(getP(a,pp)),to:palSummary(getP(b,pp))});return;}
@@ -398,18 +392,18 @@ function diff(a,b){const fa=flat(a),fb=flat(b),out=[],seen=new Set();
       const ba=(a.brands||{})[m2[1]],bb=(b.brands||{})[m2[1]];out.push({path:pp,from:lookSummary(lookOf(ba,m2[2])),to:lookSummary(lookOf(bb,m2[2]))});return;}
     out.push({path:k,from:fa[k],to:fb[k]});});
   return out;}
-function lookSummary(L){const pct=v=>Math.round(v*100)+"%";
+export function lookSummary(L){const pct=v=>Math.round(v*100)+"%";
   const base=L.kind==="gradient"&&L.to?`Gradient to ${normHex(L.to)}`:L.kind==="image"&&L.img?`Picture with a ${pct(L.veil)} color layer`:"Flat color";
   return base+(L.glass<1?`, windows ${pct(L.glass)} solid${L.blur?`, ${L.blur} px blur`:""}`:"");}
-function applyCh(st,chs){const s=clone(st);chs.forEach(c=>setP(s,c.path,c.value));return s;}
+export function applyCh(st,chs){const s=clone(st);chs.forEach(c=>setP(s,c.path,c.value));return s;}
 /* Version numbers: patch (1.4.0 -> 1.4.1) for value tweaks, minor (-> 1.5.0) for new things, major (-> 2.0.0) when something apps use goes away.
    Without a bump, it is minor, like before. */
-const BUMPS=["patch","minor","major"];
-function nextVer(v,bump="minor"){const [a,b,c]=String(v||"0.0.0").split(".").map(n=>parseInt(n,10)||0);
+export const BUMPS=["patch","minor","major"];
+export function nextVer(v,bump="minor"){const [a,b,c]=String(v||"0.0.0").split(".").map(n=>parseInt(n,10)||0);
   return bump==="major"?`${a+1}.0.0`:bump==="patch"?`${a}.${b}.${c+1}`:`${a}.${b+1}.0`;}
 /* Suggests a bump by comparing the CSS variables apps use. A removed variable can break an app, so that is major. */
-function cssVarNames(st){return new Set((themeCss(st,"x").match(/--[a-z0-9-]+(?=\s*:)/gi)||[]));}
-function bumpFor(pub,draft){const a=cssVarNames(pub),b=cssVarNames(draft),removed=[...a].filter(x=>!b.has(x)),added=[...b].filter(x=>!a.has(x));
+export function cssVarNames(st){return new Set((themeCss(st,"x").match(/--[a-z0-9-]+(?=\s*:)/gi)||[]));}
+export function bumpFor(pub,draft){const a=cssVarNames(pub),b=cssVarNames(draft),removed=[...a].filter(x=>!b.has(x)),added=[...b].filter(x=>!a.has(x));
   if(removed.length) return {bump:"major",removed,added,why:`${removed.length} CSS variable${removed.length>1?"s that apps may use are":" that apps may use is"} gone, like ${removed.slice(0,3).join(", ")}. Apps that use ${removed.length>1?"them":"it"} need a change.`};
   if(added.length) return {bump:"minor",removed,added,why:`This adds ${added.length} new CSS variable${added.length>1?"s":""}, like ${added.slice(0,3).join(", ")}. Nothing apps use goes away.`};
   return {bump:"patch",removed,added,why:"Only values change, like colors and sizes. Every name apps use stays the same."};}
@@ -417,19 +411,19 @@ function bumpFor(pub,draft){const a=cssVarNames(pub),b=cssVarNames(draft),remove
    OUTPUTS: W3C design token files, theme.css for Tailwind v4 + shadcn,
    component settings, and the component manifest for AI tools.
    ===================================================================== */
-function dtColor(hex){const [r,g,b]=hexToRgb(hex).map(v=>+(v/255).toFixed(4));return {colorSpace:"srgb",components:[r,g,b],hex:hex.toLowerCase()};}
-function hexOfDt(v){if(typeof v==="string") return normHex(v);if(v&&v.hex) return normHex(v.hex);if(v&&Array.isArray(v.components)) return rgbToHex(v.components.map(x=>x*255));return "#000000";}
-function slug(t){return String(t).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");}
-function dim(n){return {value:n,unit:"px"};}
-function dimVal(v){return typeof v==="number"?v:(v&&typeof v.value==="number"?v.value:0);}
-const EXT="org.brand-console";
+export function dtColor(hex){const [r,g,b]=hexToRgb(hex).map(v=>+(v/255).toFixed(4));return {colorSpace:"srgb",components:[r,g,b],hex:hex.toLowerCase()};}
+export function hexOfDt(v){if(typeof v==="string") return normHex(v);if(v&&v.hex) return normHex(v.hex);if(v&&Array.isArray(v.components)) return rgbToHex(v.components.map(x=>x*255));return "#000000";}
+export function slug(t){return String(t).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");}
+export function dim(n){return {value:n,unit:"px"};}
+export function dimVal(v){return typeof v==="number"?v:(v&&typeof v.value==="number"?v.value:0);}
+export const EXT="org.brand-console";
 
 /* ---- the editable state <-> DTCG files (the source of truth on disk) ---- */
 /* Standard tokens for the page look. The full settings, including a picture, are kept in $extensions. */
-function lookTokens(br,md){const L=lookOf(br,md),o={"window-opacity":{$type:"number",$value:L.glass,$description:"How solid windows and cards are. 1 is fully solid."},"window-blur":{$type:"dimension",$value:dim(L.blur),$description:"How much windows blur what is behind them."}};
+export function lookTokens(br,md){const L=lookOf(br,md),o={"window-opacity":{$type:"number",$value:L.glass,$description:"How solid windows and cards are. 1 is fully solid."},"window-blur":{$type:"dimension",$value:dim(L.blur),$description:"How much windows blur what is behind them."}};
   if(L.kind==="gradient"&&L.to) o["page-gradient"]={$type:"gradient",$value:[{color:dtColor(bgOf(br,md,"page")),position:0},{color:dtColor(L.to),position:1}],$description:"The page background gradient.",$extensions:{[EXT]:{direction:L.angle}}};
   return o;}
-function stateToFiles(st){
+export function stateToFiles(st){
   const f={};
   BRANDS.forEach(B=>{const br=st.brands[B.id];if(!br) return;
     const doc={$description:`${B.name} brand colors. Only this file changes between brands.`,
@@ -466,7 +460,7 @@ function stateToFiles(st){
     resolutionOrder:[{$ref:"#/sets/foundations"},{$ref:"#/sets/components"},{$ref:"#/modifiers/brand"}]};
   return f;
 }
-function filesToState(files){
+export function filesToState(files){
   const st=clone(BASE);st.brands={};
   BRANDS.forEach(B=>{const doc=files[`tokens/brands/${B.id}.tokens.json`];if(!doc) return;const x=(doc.$extensions||{})[EXT]||{},cb=doc.color.brand;
     const br={primary:hexOfDt(cb.primary.$value),secondary:hexOfDt(cb.secondary.$value),accent:hexOfDt(cb.accent.$value),onPrimary:x.wordsOnMainColor||"white"};
@@ -490,7 +484,7 @@ function filesToState(files){
   if(fc) Object.entries(fc.component||{}).forEach(([id,t])=>{const x=(t.$extensions||{})[EXT]||{};if(x.settings) st.comp[id]={...(st.comp[id]||{}),...x.settings};if(typeof x.guidance==="string") st.guidance[id]=x.guidance;});
   return withDefaults(st);
 }
-function withDefaults(st){
+export function withDefaults(st){
   registerFonts(st);
   if(st.fontLib){const L=fontLibOf(st);if(!L.added.length&&!L.removed.length&&!Object.keys(L.files).length) delete st.fontLib;else st.fontLib=L;}
   Object.values(st.brands||{}).forEach(br=>{if(br.bg&&!Object.keys(br.bg).length) delete br.bg;});
@@ -505,7 +499,7 @@ function withDefaults(st){
 }
 
 /* ---- CSS variables, split by what they depend on ---- */
-function varsColor(st,b,mode){
+export function varsColor(st,b,mode){
   const c=colorsFor(st,b,mode), C=st.comp;
   return {"--background":c.background,"--foreground":c.foreground,"--card":c.card,"--card-foreground":c.foreground,
     "--primary":c.P,"--primary-foreground":c.onP,"--secondary":c.secondary,"--secondary-foreground":c.secondaryFg,
@@ -517,9 +511,9 @@ function varsColor(st,b,mode){
     "--card-border":C.card.border==="on"?"1px solid "+c.border:"none",
     "--page-fill":c.fill,"--panel":c.panel,"--panel-blur":(c.blur||0)+"px"};
 }
-function varsSize(st,ctx,size){const z=sizesFor(st,ctx,size);
+export function varsSize(st,ctx,size){const z=sizesFor(st,ctx,size);
   return {"--text-base":z.base+"px","--text-sm":z.sm+"px","--text-h1":z.h1+"px","--text-h2":z.h2+"px","--text-h3":z.h3+"px","--control-h":z.control+"px","--gap":z.gap+"px","--pad":z.pad+"px"};}
-function varsStatic(st){const C=st.comp;
+export function varsStatic(st){const C=st.comp;
   const v={"--radius":st.shape.radius+"px",
     "--font-heading":FONTS[st.type.heading].stack,"--font-body":FONTS[st.type.body].stack,"--font-ui":FONTS[uiFont(st)].stack,"--heading-style":st.type.headingStyle==="italic"&&FONTS[st.type.heading].italic?"italic":"normal","--heading-w":st.type.headingWeight,"--lh":st.type.lineHeight,
     "--btn-radius":rad(st,C.button.radius)+"px","--btn-weight":C.button.weight,"--btn-case":C.button.case==="upper"?"uppercase":"none","--btn-track":C.button.case==="upper"?".06em":({normal:"0",wide:".02em",wider:".04em"}[C.button.track]||"0"),"--btn-pad-x":C.button.pad==="roomy"?".6":".42",
@@ -528,12 +522,12 @@ function varsStatic(st){const C=st.comp;
     "--dialog-radius":rad(st,C.dialog.radius)+"px","--overlay":(C.dialog.overlay/100).toFixed(2),"--dialog-justify":"flex-end","--dialog-dir":C.dialog.order==="end"?"row":"row-reverse"};
   compVars(st).split(";").filter(Boolean).forEach(kv=>{const i=kv.indexOf(":");v[kv.slice(0,i)]=kv.slice(i+1);});
   return v;}
-function css(o){return Object.entries(o).map(([k,x])=>k+":"+x).join(";");}
-function pvVars(st,b,ctx,size,mode){
+export function css(o){return Object.entries(o).map(([k,x])=>k+":"+x).join(";");}
+export function pvVars(st,b,ctx,size,mode){
   return css(varsColor(st,b,mode||(typeof S!=="undefined"?S.ui.mode:"light")))+";"+css(varsSize(st,ctx,size))+";"+css(varsStatic(st));
 }
 
-function themeCss(st,version){
+export function themeCss(st,version){
   const L=[],block=(sel,o)=>{L.push(`${sel} {`,...Object.entries(o).map(([k,x])=>`  ${k}: ${x};`),`}`,``);};
   L.push(`/* Generated by the Brand Console from version ${version}. Do not edit by hand. */`,
     `/* Import this after Tailwind: @import "tailwindcss"; @import "./theme.css"; */`,
@@ -551,20 +545,20 @@ function themeCss(st,version){
   L.push(`/* Base styles every product gets. */`,`body { background: var(--page-fill) center / cover no-repeat fixed, var(--background); color: var(--foreground); font-family: var(--font-body); font-size: var(--text-base); line-height: var(--lh); }`,``);
   return L.join("\n");
 }
-function manifest(st,version){
+export function manifest(st,version){
   return {$description:"Read by Storybook and AI tools. One entry per component.",version,
     components:REG_ORDER.map(id=>{const r=REG[id];return {id,name:r.name,category:CATN[r.cat],level:r.level,description:r.desc,builtFrom:(r.from||[]).filter(x=>REG[x]),
       props:(r.props||[]).map(([name,values,notes])=>({name,values,notes})),settings:{...(st.comp[id]||{})},accessibility:r.a11y||"",guidance:st.guidance[id]||""};}),
     ...(typeof ICONS!=="undefined"?{icons:{$description:"The only icons teams should use. Names match lucide-react (Calendar for calendar, HeartPulse for heart-pulse). Always put words next to an icon, or give a lone icon a label.",set:ICON_SET.name,version:ICON_SET.version,lineThickness:(st.comp.icon||{}).stroke||2,groups:ICON_CATS.map(([id,label,names])=>({id,label,names}))}}:{})};
 }
-function settingsJson(st){const names=[st.type.heading,st.type.body,uiFont(st)],L=fontLibOf(st);
+export function settingsJson(st){const names=[st.type.heading,st.type.body,uiFont(st)],L=fontLibOf(st);
   return {brands:BRANDS.map(b=>b.id),fonts:{heading:st.type.heading,body:st.type.body,labels:uiFont(st),headingStyle:st.type.headingStyle||"normal",href:fontHref(names),
     needLicense:[...new Set(names.filter(n=>FONTS[n]&&FONTS[n].licensed&&!FONTS[n].hosted))],
     files:[...new Set(names)].flatMap(n=>(L.files[n]||[]).map(x=>({family:n,weight:Number(x.weight)||400,style:x.style==="italic"?"italic":"normal",file:x.file})))},components:st.comp};}
 /* Every token with its final value: role colors per brand and mode, sizes per screen type and text size, and the
    CSS variables from theme.css. For tools that cannot run this engine. It is a snapshot, not a set of aliases:
    tokens/*.tokens.json stay the source, and this file is made again from them on every build and publish. */
-function resolvedTokens(st,version){
+export function resolvedTokens(st,version){
   const isHex=v=>typeof v==="string"&&/^#[0-9a-f]{6}$/i.test(v);
   const colors=o=>Object.fromEntries(Object.entries(o).filter(([,v])=>isHex(v)).map(([k,v])=>[k.slice(2),{$value:dtColor(v)}]));
   const px=o=>Object.fromEntries(Object.entries(o).map(([k,v])=>[k.slice(2),{$value:dim(parseFloat(v))}]));
@@ -585,7 +579,7 @@ function resolvedTokens(st,version){
     size:{$type:"dimension",...Object.fromEntries(CTX.map(c=>[c,Object.fromEntries(SZ.map(z=>[z,px(varsSize(st,c,z))]))]))},
   };
 }
-function files(st,version){
+export function files(st,version){
   const f={};const src=stateToFiles(st);Object.keys(src).forEach(k=>f[k.replace(/^tokens\//,"tokens/")]=src[k]);
   f["theme.css"]=themeCss(st,version);
   f["components.manifest.json"]=manifest(st,version);
@@ -595,3 +589,6 @@ function files(st,version){
   f[".mcp.json"]={mcpServers:{"design-system":{type:"http",url:"http://localhost:6006/mcp"},shadcn:{command:"npx",args:["shadcn@latest","mcp"]}}};
   return f;
 }
+export { BRANDS, BN, RADII, esc, rad, shadow };
+/* Each component's defaults and guidance go into the base system. The registry is loaded before this file runs. */
+REG_ORDER.forEach(id=>{const R=REG[id];if(!BASE.comp[id]) BASE.comp[id]={...(R.defaults||{})};if(R.guide&&!BASE.guidance[id]) BASE.guidance[id]=R.guide;});

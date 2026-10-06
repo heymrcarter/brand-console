@@ -5,15 +5,16 @@
    level: Primitive < Component < Composite < Healthcare
    slot types: radius | shadow | num (unit) | enum
    ===================================================================== */
-const CATS=[["actions","Actions"],["inputs","Form inputs"],["structure","Form structure"],["feedback","Feedback"],["content","Content"],["navigation","Navigation"],["overlays","Overlays"],["data","Data"],["layout","Layout"],["health","Healthcare"]];
-const CATN=Object.fromEntries(CATS);
-const REG={}, REG_ORDER=[];
-function def(o){REG[o.id]=o;REG_ORDER.push(o.id);}
-const RAD4=[["none","None"],["sm","Small"],["md","Medium"],["lg","Large"]];
-const SHD=[["none","None"],["soft","Soft"],["strong","Strong"]];
+import { BN, RADII, esc, rad, shadow } from "./basics.js";
+export const CATS=[["actions","Actions"],["inputs","Form inputs"],["structure","Form structure"],["feedback","Feedback"],["content","Content"],["navigation","Navigation"],["overlays","Overlays"],["data","Data"],["layout","Layout"],["health","Healthcare"]];
+export const CATN=Object.fromEntries(CATS);
+export const REG={}, REG_ORDER=[];
+export function def(o){REG[o.id]=o;REG_ORDER.push(o.id);}
+export const RAD4=[["none","None"],["sm","Small"],["md","Medium"],["lg","Large"]];
+export const SHD=[["none","None"],["soft","Soft"],["strong","Strong"]];
 
 /* ---------- small icon set for specimens (stroke = currentColor) ---------- */
-const ICP={
+export const ICP={
   check:'<path d="M4 12.5l5 5L20 7"/>',x:'<path d="M6 6l12 12M18 6L6 18"/>',down:'<path d="M6 9l6 6 6-6"/>',up:'<path d="M6 15l6-6 6 6"/>',right:'<path d="M9 6l6 6-6 6"/>',left:'<path d="M15 6l-6 6 6 6"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',minus:'<path d="M5 12h14"/>',search:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
   cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
@@ -26,11 +27,11 @@ const ICP={
   lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',dl:'<path d="M12 4v12M7 11l5 5 5-5M4 20h16"/>',trash:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',edit:'<path d="M4 20h4L20 8l-4-4L4 16z"/>',
   help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17v.5"/>',card:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/>',star:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
   printer:'<path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M7 14h10v7H7z"/>',msg:'<path d="M4 5h16v11H9l-5 4z"/>',shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>'};
-function ic(n,cls=""){return `<svg class="ico ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="stroke-width:var(--c-icon-stroke,2)" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICP[n]||""}</svg>`;}
-const SG=(l,h)=>`<div class="grp"><div class="sl">${l}</div>${h}</div>`;
-const FLD=(label,inner,help,o={})=>`<div class="pv-field${o.err?" err":""}"><span class="lb">${label}${o.opt?` <span class="muted" style="font-weight:400">${o.opt}</span>`:""}</span>${o.hintTop?`<span class="pv-help">${o.hintTop}</span>`:""}${inner}${help?`<span class="pv-help">${o.err?ic("err")+" ":""}${help}</span>`:""}</div>`;
-const CB=(on,label,o={})=>`<div class="pv-opt"><span class="pv-cb${on?" on":""}${o.cls?" "+o.cls:""}">${on==="mixed"?ic("minus"):on?ic("check"):""}</span><span class="t"><span>${label}</span>${o.hint?`<span class="pv-help" style="display:block">${o.hint}</span>`:""}</span></div>`;
-const RD=(on,label,o={})=>`<div class="pv-opt"><span class="pv-rd${on?" on":""}${o.cls?" "+o.cls:""}"><i></i></span><span class="t"><span>${label}</span>${o.hint?`<span class="pv-help" style="display:block">${o.hint}</span>`:""}</span></div>`;
+export function ic(n,cls=""){return `<svg class="ico ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="stroke-width:var(--c-icon-stroke,2)" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICP[n]||""}</svg>`;}
+export const SG=(l,h)=>`<div class="grp"><div class="sl">${l}</div>${h}</div>`;
+export const FLD=(label,inner,help,o={})=>`<div class="pv-field${o.err?" err":""}"><span class="lb">${label}${o.opt?` <span class="muted" style="font-weight:400">${o.opt}</span>`:""}</span>${o.hintTop?`<span class="pv-help">${o.hintTop}</span>`:""}${inner}${help?`<span class="pv-help">${o.err?ic("err")+" ":""}${help}</span>`:""}</div>`;
+export const CB=(on,label,o={})=>`<div class="pv-opt"><span class="pv-cb${on?" on":""}${o.cls?" "+o.cls:""}">${on==="mixed"?ic("minus"):on?ic("check"):""}</span><span class="t"><span>${label}</span>${o.hint?`<span class="pv-help" style="display:block">${o.hint}</span>`:""}</span></div>`;
+export const RD=(on,label,o={})=>`<div class="pv-opt"><span class="pv-rd${on?" on":""}${o.cls?" "+o.cls:""}"><i></i></span><span class="t"><span>${label}</span>${o.hint?`<span class="pv-help" style="display:block">${o.hint}</span>`:""}</span></div>`;
 
 /* ======================= ACTIONS ======================= */
 def({id:"button",cat:"actions",level:"Primitive",name:"Button",legacy:true,
@@ -232,7 +233,7 @@ def({id:"error-summary",cat:"structure",level:"Component",name:"Error summary",
   spec:()=>`<div class="pv-errsum"><h2 class="h3">There is a problem</h2><ul><li><span class="lnk">Enter a ZIP code with 5 numbers, like 60601.</span></li><li><span class="lnk">The day must be between 1 and 31.</span></li></ul></div>`});
 
 /* ======================= FEEDBACK ======================= */
-const TONES={info:["info","Information"],success:["ok","Success"],warning:["warn","Warning"],danger:["err","Error"]};
+export const TONES={info:["info","Information"],success:["ok","Success"],warning:["warn","Warning"],danger:["err","Error"]};
 def({id:"alert",cat:"feedback",level:"Component",name:"Alert",
   desc:"A message inside the page that tells people something important.",
   slots:[{k:"style",label:"Style",opts:[["soft","Soft color fill"],["outline","White with a colored line"]]}],defaults:{style:"soft"},from:["icon","link"],
@@ -611,11 +612,9 @@ def({id:"consent",cat:"health",level:"Healthcare",name:"Consent and signature",
   spec:cfg=>`<div class="pv-stack"><h3 class="h3">Share your records with Dr. Patel</h3><div class="pv-terms"><p><b>In short:</b> Dr. Patel's office can see your last 2 years of visits and lab results. You can stop this at any time.</p><p class="muted small">Full terms: This authorization permits Main Street Family Medicine to access…</p></div><span class="lnk small">${ic("dl")} Download the full terms</span>${CB(1,"I have read this and I agree.")}${cfg.sign==="typed"?FLD("Type your full name",`<div class="pv-in" style="font-style:italic">June A. Morris</div>`,"Typing your name counts as your signature. Today's date is September 28, 2026."):""}<div class="pv-row acts"><span class="pv-btn primary">Sign and send</span></div></div>`});
 
 /* current brand name for specimens */
-function x_brand(){return BN[S.ui.brand]||"Brand";}
-/* defaults + guidance into the base system */
-REG_ORDER.forEach(id=>{const R=REG[id];if(!BASE.comp[id]) BASE.comp[id]={...(R.defaults||{})};if(R.guide&&!BASE.guidance[id]) BASE.guidance[id]=R.guide;});
-function slotOf(id,k){const R=REG[id];return R&&R.slots?R.slots.find(s=>s.k===k):null;}
-function compVars(st){
+export function x_brand(){return BN[S.ui.brand]||"Brand";}
+export function slotOf(id,k){const R=REG[id];return R&&R.slots?R.slots.find(s=>s.k===k):null;}
+export function compVars(st){
   const v=[];REG_ORDER.forEach(id=>{const R=REG[id],cfg=st.comp[id]||{};(R.slots||[]).forEach(s=>{if(!s.type)return;const val=cfg[s.k];if(val===undefined)return;
     const n=`--c-${id}-${s.k}`;if(s.type==="radius")v.push(n+":"+rad(st,val)+"px");else if(s.type==="shadow")v.push(n+":"+shadow(val));else if(s.type==="num")v.push(n+":"+val+(s.unit||""));});});
   v.push("--c-icon-stroke:"+(st.comp.icon?st.comp.icon.stroke:2));
