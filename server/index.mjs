@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createStore } from "./store.mjs";
 import { createFigma } from "./figma.mjs";
+import { createDiskStorage, createEnvSecrets } from "./storage/disk.mjs";
 import { readableStaticFile, isConsoleFile } from "./static.mjs";
 import { hostingConfig, refuseMessage, createAuth } from "./auth.mjs";
 
@@ -19,9 +20,11 @@ const PORT = Number(process.env.PORT || env.PORT || 5173);
 const STORYBOOK = process.env.STORYBOOK_URL || env.STORYBOOK_URL || "http://127.0.0.1:6006";
 const KEY = process.env.ANTHROPIC_API_KEY || env.ANTHROPIC_API_KEY || "";
 const MODEL = process.env.ANTHROPIC_MODEL || env.ANTHROPIC_MODEL || "claude-sonnet-5";
-const store = createStore(root);
-store.buildAll();
-const figma = createFigma({ root, store });
+// On this computer, the design system's files live in the project folder and secrets live in .env.
+const storage = createDiskStorage(root);
+const store = createStore(storage);
+await store.buildAll();
+const figma = createFigma({ storage, secrets: createEnvSecrets(root), store, apiBase: process.env.FIGMA_API });
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf", ".otf": "font/otf" };
 
@@ -36,8 +39,9 @@ function send(res, code, body, type = "application/json", headers = {}) {
 function body(req) {
   return new Promise((ok, bad) => { let d = ""; req.on("data", (c) => { d += c; if (d.length > 20e6) req.destroy(); }); req.on("end", () => { try { ok(d ? JSON.parse(d) : {}); } catch { bad(Object.assign(new Error("The request was not valid JSON."), { status: 400 })); } }); });
 }
-function state() {
-  return { draft: store.draft(), published: store.published(), history: store.index().versions, ai: !!KEY, model: KEY ? MODEL : null, storybook: STORYBOOK, figma: figma.status(), shared: auth.shared };
+async function state() {
+  const [draft, published, index, figmaStatus] = await Promise.all([store.draft(), store.published(), store.index(), figma.status()]);
+  return { draft, published, history: index.versions, ai: !!KEY, model: KEY ? MODEL : null, storybook: STORYBOOK, figma: figmaStatus, shared: auth.shared };
 }
 async function ask(turns) {
   if (!KEY) { const e = new Error("No Claude API key is set. Add ANTHROPIC_API_KEY to the .env file."); e.status = 503; throw e; }
@@ -54,9 +58,9 @@ async function ask(turns) {
 const routes = {
   "GET /api/state": async () => state(),
   "PUT /api/draft": async (req) => { const b = await body(req); return store.saveDraft(b.draft); },
-  "POST /api/publish": async (req) => { const b = await body(req); const v = store.publish(b); return { version: v, ...state() }; },
-  "POST /api/rollback": async (req) => { const b = await body(req); const v = store.rollback(b); return { version: v, ...state() }; },
-  "POST /api/flag": async (req) => { const b = await body(req); return { flag: store.flag(b.version), history: store.index().versions }; },
+  "POST /api/publish": async (req) => { const b = await body(req); const v = await store.publish(b); return { version: v, ...(await state()) }; },
+  "POST /api/rollback": async (req) => { const b = await body(req); const v = await store.rollback(b); return { version: v, ...(await state()) }; },
+  "POST /api/flag": async (req) => { const b = await body(req); return { flag: await store.flag(b.version), history: (await store.index()).versions }; },
   "POST /api/ask": async (req) => { const b = await body(req); return { text: await ask(b.turns || []) }; },
   "GET /api/health": async () => ({ ok: true }),
   "POST /api/fonts": async (req) => { const b = await body(req); return store.saveFont(b); },
@@ -65,10 +69,10 @@ const routes = {
   "POST /api/figma/link": async (req) => figma.setLink(await body(req)),
   "POST /api/figma/disconnect": async (req) => figma.disconnect(await body(req)),
   "POST /api/figma/compare": async (req) => figma.compare(await body(req)),
-  "POST /api/figma/apply": async (req) => { const r = await figma.apply(await body(req)); return { ...r, ...state() }; },
+  "POST /api/figma/apply": async (req) => { const r = await figma.apply(await body(req)); return { ...r, ...(await state()) }; },
   "GET /api/figma/files": async () => figma.exportFiles(),
   "POST /api/figma/files/compare": async (req) => figma.compareFiles(await body(req)),
-  "POST /api/figma/files/apply": async (req) => { const r = figma.applyFiles(await body(req)); return { ...r, ...state() }; },
+  "POST /api/figma/files/apply": async (req) => { const r = await figma.applyFiles(await body(req)); return { ...r, ...(await state()) }; },
 };
 
 async function handle(req, res) {

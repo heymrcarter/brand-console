@@ -13,16 +13,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createStore } from "../server/store.mjs";
+import { createDiskStorage } from "../server/storage/disk.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const live = args.includes("--live");
 const at = args.indexOf("--out");
-const store = createStore(root);
-const latest = store.index().versions[0];
+const store = createStore(createDiskStorage(root));
+const latest = (await store.index()).versions[0];
 if (live && !latest) { console.error("Nothing is live yet. Publish a version first, or leave out --live to export the draft."); process.exit(1); }
 
-const st = live ? store.stateOfRelease(latest.version) : store.draft();
+const st = live ? await store.stateOfRelease(latest.version) : await store.draft();
 const version = live ? latest.version : (latest ? latest.version : "0.0.0") + "-draft";
 const out = at >= 0 && args[at + 1] ? path.resolve(process.cwd(), args[at + 1]) : path.join(root, live ? "dist" : "build/draft", "tokens.resolved.json");
 fs.mkdirSync(path.dirname(out), { recursive: true });

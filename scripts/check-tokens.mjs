@@ -9,24 +9,25 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createStore } from "../server/store.mjs";
+import { createDiskStorage } from "../server/storage/disk.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const at = args.indexOf("--dir");
-const store = createStore(root);
+const store = createStore(createDiskStorage(root));
 const E = store.E;
 
 let st, what;
 if (at >= 0) {
   const dir = path.resolve(process.cwd(), args[at + 1] || "");
   if (!fs.existsSync(dir)) { console.error(`There is no folder at ${dir}.`); process.exit(2); }
-  st = E.filesToState(store.readTokenDir(dir)); what = `the tokens in ${path.relative(process.cwd(), dir) || "."}`;
+  st = E.filesToState(await createStore(createDiskStorage(dir)).readTokenDir("")); what = `the tokens in ${path.relative(process.cwd(), dir) || "."}`;
 } else if (args.includes("--live")) {
-  const l = store.index().versions[0];
+  const l = (await store.index()).versions[0];
   if (!l) { console.error("Nothing is live yet."); process.exit(2); }
-  st = store.stateOfRelease(l.version); what = `the live version, ${l.version}`;
+  st = await store.stateOfRelease(l.version); what = `the live version, ${l.version}`;
 } else {
-  st = store.draft(); what = "the draft in tokens/";
+  st = await store.draft(); what = "the draft in tokens/";
 }
 
 const results = E.runChecks(st);

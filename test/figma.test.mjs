@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createStore } from "../server/store.mjs";
 import { createFigma, parseFigmaKey } from "../server/figma.mjs";
+import { createDiskStorage, createEnvSecrets } from "../server/storage/disk.mjs";
 import { startFigmaMock } from "./figma-mock.mjs";
 
 const here = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -24,8 +25,9 @@ before(async () => {
   mock.addVariable(o.id, "space/xl", "FLOAT", { Default: 32 });
   mock.addStyle("FILL", "Brand/Sunset orange", { fills: [{ type: "SOLID", color: { r: 0.95, g: 0.45, b: 0.2, a: 1 } }] });
   mock.addStyle("TEXT", "Heading/H1", { style: { fontFamily: "Inter", fontWeight: 700, fontSize: 32 } });
-  store = createStore(root); E = store.E;
-  figma = createFigma({ root, store, apiBase: mock.url });
+  const storage = createDiskStorage(root);
+  store = createStore(storage); E = store.E;
+  figma = createFigma({ storage, secrets: createEnvSecrets(root), store, apiBase: mock.url });
 });
 after(async () => { await mock.close(); fs.rmSync(root, { recursive: true, force: true }); });
 
@@ -55,7 +57,7 @@ test("first sync reads the existing file, keeps its values, and adds what is mis
   assert.equal(r.otherVariables, 1);
   const res = await figma.apply({ role: "brand", addColors: [{ brand: "northfield", name: "Brand/Sunset orange", hex: "#F27333" }] });
   assert.equal(res.ok, true); assert.ok(res.sentToFigma.created > 150); assert.equal(res.sentToFigma.collections, 4);
-  const d = store.draft();
+  const d = await store.draft();
   assert.equal(d.brands.northfield.primary, "#40661A");
   assert.ok(d.brands.northfield.palette.groups.find((g) => g.id === "from-figma").colors.some((c) => c.name === "Sunset orange"));
   assert.deepEqual(await sameAll(), [], "after the sync, both sides match");
@@ -70,12 +72,12 @@ test("a change in Figma comes into the console, and colors made from it follow i
   const main = rowOf(r.rows, "brand::Main color@@Northfield");
   assert.equal(main.status, "figma"); assert.equal(main.pick, "figma");
   await figma.apply({ role: "brand" });
-  assert.equal(store.draft().brands.northfield.primary, "#6B2E82");
+  assert.equal((await store.draft()).brands.northfield.primary, "#6B2E82");
   assert.deepEqual(await sameAll(), []);
 });
 
 test("a change in the console goes to Figma", async () => {
-  const d = store.draft(); d.shape.radius = 12; store.saveDraft(d);
+  const d = await store.draft(); d.shape.radius = 12; await store.saveDraft(d);
   const r = await figma.compare({ role: "brand" });
   assert.equal(rowOf(r.rows, "found::Corners/Base radius@@Value").status, "console");
   await figma.apply({ role: "brand" });
@@ -83,14 +85,14 @@ test("a change in the console goes to Figma", async () => {
 });
 
 test("a change on both sides waits for a person to pick", async () => {
-  const d = store.draft(); d.shape.radius = 6; store.saveDraft(d);
+  const d = await store.draft(); d.shape.radius = 6; await store.saveDraft(d);
   mock.setValue("Foundations", "Corners/Base radius", "Value", 10);
   const r = await figma.compare({ role: "brand" });
   const row = rowOf(r.rows, "found::Corners/Base radius@@Value");
   assert.equal(row.status, "both"); assert.equal(row.pick, null);
   await assert.rejects(figma.apply({ role: "brand" }), /Pick which one to keep/);
   await figma.apply({ role: "brand", picks: { [row.rk]: "figma" } });
-  assert.equal(store.draft().shape.radius, 10);
+  assert.equal((await store.draft()).shape.radius, 10);
   assert.deepEqual(await sameAll(), []);
 });
 
@@ -102,7 +104,7 @@ test("values that do not fit the console are sent back", async () => {
   assert.equal(font.status, "bad"); assert.equal(font.canFigma, false); assert.match(font.why, /not in the font library/);
   assert.equal(edge.status, "fixed"); assert.equal(edge.pick, "console");
   await figma.apply({ role: "brand" });
-  assert.equal(mock.find("Foundations", "Font/Body").byMode.Value, store.draft().type.body);
+  assert.equal(mock.find("Foundations", "Font/Body").byMode.Value, (await store.draft()).type.body);
   assert.deepEqual(await sameAll(), []);
 });
 
@@ -115,7 +117,7 @@ test("only the admin team takes spacing from Figma", async () => {
   row = rowOf(r.rows, "found::Size/Consumer/Control height@@Value");
   assert.equal(row.pick, "figma");
   await figma.apply({ role: "admin" });
-  assert.equal(store.draft().density.consumer.control, 52);
+  assert.equal((await store.draft()).density.consumer.control, 52);
 });
 
 test("color set colors can be added and removed from either side", async () => {
@@ -127,11 +129,11 @@ test("color set colors can be added and removed from either side", async () => {
   assert.equal(mint.status, "extra"); assert.equal(mint.pick, "figma");
   assert.equal(gone.status, "gone"); assert.equal(gone.pick, "figma");
   await figma.apply({ role: "brand" });
-  const acc = store.draft().brands.northfield.palette.groups.find((g) => g.name === "Accent colors").colors.map((c) => c.name);
+  const acc = (await store.draft()).brands.northfield.palette.groups.find((g) => g.name === "Accent colors").colors.map((c) => c.name);
   assert.ok(acc.includes("Mint")); assert.ok(!acc.includes("Coral"));
   assert.deepEqual(await sameAll(), []);
   // Removed in the console: picked for removal in Figma too.
-  const d = store.draft(); const g = d.brands.northfield.palette.groups.find((x) => x.name === "Accent colors"); g.colors = g.colors.filter((c) => c.name !== "Mint"); store.saveDraft(d);
+  const d = await store.draft(); const g = d.brands.northfield.palette.groups.find((x) => x.name === "Accent colors"); g.colors = g.colors.filter((c) => c.name !== "Mint"); await store.saveDraft(d);
   const r2 = await figma.compare({ role: "brand" });
   const del = rowOf(r2.rows, "sets::Northfield/Accent colors/Mint@@Value");
   assert.equal(del.status, "deleted"); assert.equal(del.pick, "console");
@@ -141,7 +143,7 @@ test("color set colors can be added and removed from either side", async () => {
 
 test("a variable with the wrong kind is skipped, and the rest still syncs", async () => {
   const f = mock.find("Foundations", "Shadow/Default"); f.v.resolvedType = "FLOAT"; f.v.valuesByMode = { [f.c.modes[0].modeId]: 3 };
-  const d = store.draft(); d.shape.radius = 9; store.saveDraft(d);
+  const d = await store.draft(); d.shape.radius = 9; await store.saveDraft(d);
   const r = await figma.compare({ role: "brand" });
   assert.equal(rowOf(r.rows, "found::Shadow/Default@@Value").status, "type");
   await figma.apply({ role: "brand" });
@@ -156,7 +158,7 @@ test("safeguards: conflicts on removed colors, extra modes, long names, see-thro
   mock.addVariable(sets.id, "Northfield/Accent colors/Reds/Light red", "COLOR", { Value: { r: 1, g: 0.6, b: 0.6, a: 1 } });
   mock.addVariable(sets.id, "Northfield/Accent colors/Fog", "COLOR", { Value: { r: 0.9, g: 0.9, b: 0.9, a: 0.5 } });
   // The console removes Navy, while a designer changes Navy in Figma.
-  const d = store.draft(); const g = d.brands.northfield.palette.groups.find((x) => x.name === "Accent colors"); g.colors = g.colors.filter((c) => c.name !== "Navy"); store.saveDraft(d);
+  const d = await store.draft(); const g = d.brands.northfield.palette.groups.find((x) => x.name === "Accent colors"); g.colors = g.colors.filter((c) => c.name !== "Navy"); await store.saveDraft(d);
   mock.setValue("Color sets", "Northfield/Accent colors/Navy", "Value", { r: 0.1, g: 0.2, b: 0.5, a: 1 });
   // Aliases: one that points nowhere, and one that points to their own token.
   const own = Object.values(mock.db.collections).find((c) => c.name === "Their own tokens");
@@ -177,10 +179,10 @@ test("safeguards: conflicts on removed colors, extra modes, long names, see-thro
   // A pick the review did not offer is ignored.
   mock.setValue("Foundations", "Size/Employee/Space between items", "Value", 20);
   const r2 = await figma.compare({ role: "brand" });
-  const before = store.draft().density.employee.gap;
+  const before = (await store.draft()).density.employee.gap;
   await figma.apply({ role: "brand", picks: { [navy.rk]: "figma", [radius.rk]: "console", "found::Size/Employee/Space between items@@Value": "figma" } });
-  assert.equal(store.draft().density.employee.gap, before);
-  assert.ok(store.draft().brands.northfield.palette.groups.find((x) => x.name === "Accent colors").colors.some((c) => c.name === "Navy"), "Navy came back with Figma's color");
+  assert.equal((await store.draft()).density.employee.gap, before);
+  assert.ok((await store.draft()).brands.northfield.palette.groups.find((x) => x.name === "Accent colors").colors.some((c) => c.name === "Navy"), "Navy came back with Figma's color");
   const f = mock.find("Foundations", "Corners/Base radius"); assert.deepEqual(f.byMode.Value, { type: "VARIABLE_ALIAS", id: xl.id }, "the alias was not replaced");
   assert.equal(mock.find("Brand colors", "Accent color").byMode.Northfield.id, "VariableID:nope");
   assert.ok(mock.find("Color sets", "Northfield/Accent colors/Fog"), "the see-through color stays in Figma");
@@ -200,23 +202,23 @@ test("collections that extend another collection are not used", () => {
 test("when the plan blocks variables, files work instead", async () => {
   mock.plan = "organization";
   await assert.rejects(figma.compare({ role: "brand" }), /Enterprise plan/);
-  assert.equal(figma.status().varsBlocked, true);
-  const { files } = figma.exportFiles();
+  assert.equal((await figma.status()).varsBlocked, true);
+  const { files } = await figma.exportFiles();
   assert.equal(files.length, 9);
   assert.ok(files.every((f) => f.json.$extensions["org.brand-console"].mode));
   // Same files back: nothing to change.
-  const same = figma.compareFiles({ files: files.map((f) => ({ name: f.name, text: JSON.stringify(f.json) })), role: "brand" });
+  const same = await figma.compareFiles({ files: files.map((f) => ({ name: f.name, text: JSON.stringify(f.json) })), role: "brand" });
   assert.equal(same.rows.filter((x) => x.status !== "same").length, 0);
   // A designer changes the gray in Figma and exports again.
   const found = files.find((f) => f.name.startsWith("Foundations")); found.json.Colors["Gray style"].$value = "cool";
-  const r = figma.compareFiles({ files: [{ name: found.name, text: JSON.stringify(found.json) }], role: "brand" });
+  const r = await figma.compareFiles({ files: [{ name: found.name, text: JSON.stringify(found.json) }], role: "brand" });
   const row = r.rows.find((x) => x.rk === "found::Colors/Gray style@@Value");
   assert.equal(row.f, "cool");
-  const out = figma.applyFiles({ files: [{ name: found.name, text: JSON.stringify(found.json) }], picks: { [row.rk]: "figma" }, role: "brand" });
-  assert.equal(store.draft().gray, "cool"); assert.equal(out.files.length, 9);
+  const out = await figma.applyFiles({ files: [{ name: found.name, text: JSON.stringify(found.json) }], picks: { [row.rk]: "figma" }, role: "brand" });
+  assert.equal((await store.draft()).gray, "cool"); assert.equal(out.files.length, 9);
   // The console changes the corners, then someone uploads the old Foundations file again.
-  const d = store.draft(); d.shape.radius = 15; store.saveDraft(d);
-  const again = figma.compareFiles({ files: [{ name: found.name, text: JSON.stringify(found.json) }], role: "brand" });
+  const d = await store.draft(); d.shape.radius = 15; await store.saveDraft(d);
+  const again = await figma.compareFiles({ files: [{ name: found.name, text: JSON.stringify(found.json) }], role: "brand" });
   const rad = again.rows.find((x) => x.rk === "found::Corners/Base radius@@Value");
   assert.equal(rad.status, "console"); assert.equal(rad.pick, "console");
   mock.plan = "enterprise";
@@ -229,16 +231,16 @@ test("file names and Figma's color formats are understood", () => {
   assert.equal(v.vals["brand::Main color@@Northfield"], "#FF8000");
 });
 
-test("uploaded fonts reach theme.css, settings.json, and the outputs folder", () => {
-  const saved = store.saveFont({ family: "Avenir Next", weight: 400, style: "normal", fileName: "AvenirNext-Regular.woff2", data: Buffer.alloc(400, 7).toString("base64") });
+test("uploaded fonts reach theme.css, settings.json, and the outputs folder", async () => {
+  const saved = await store.saveFont({ family: "Avenir Next", weight: 400, style: "normal", fileName: "AvenirNext-Regular.woff2", data: Buffer.alloc(400, 7).toString("base64") });
   assert.equal(saved.file, "fonts/avenir-next-400.woff2");
   assert.deepEqual(fs.readFileSync(path.join(root, saved.file)), Buffer.alloc(400, 7), "the font file is saved as it was sent, not as text");
-  assert.throws(() => store.saveFont({ family: "X", fileName: "x.exe", data: "AAAA" }), /\.woff2/);
-  const d = store.draft();
+  await assert.rejects(store.saveFont({ family: "X", fileName: "x.exe", data: "AAAA" }), /\.woff2/);
+  const d = await store.draft();
   d.fontLib = { files: { "Avenir Next": [{ file: saved.file, weight: 400, style: "normal" }] }, added: [{ name: "Nunito", cat: "sans", role: "best", source: "google", axes: "wght@400;700" }], removed: ["Merriweather"] };
   d.type.body = "Avenir Next"; d.type.heading = "Nunito";
-  store.saveDraft(d);
-  const back = store.draft();
+  await store.saveDraft(d);
+  const back = await store.draft();
   assert.deepEqual(back.fontLib.removed, ["Merriweather"]);
   const css = fs.readFileSync(path.join(root, "build/draft/theme.css"), "utf8");
   assert.match(css, /@font-face \{ font-family: 'Avenir Next'; src: url\("\.\/fonts\/avenir-next-400\.woff2"\) format\("woff2"\)/);

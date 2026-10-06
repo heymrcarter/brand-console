@@ -9,10 +9,11 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { loadEngine } from "../server/engine.mjs";
 import { createStore } from "../server/store.mjs";
+import { createDiskStorage } from "../server/storage/disk.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const E = loadEngine(root), store = createStore(root);
-const draft = store.draft(), published = store.published();
+const E = loadEngine(root), store = createStore(createDiskStorage(root));
+const draft = await store.draft(), published = await store.published();
 const problems = [];
 const bad = (where, what) => problems.push(`${where}: ${what}`);
 const H = (x) => { let s = String(x || "").trim().toUpperCase(); if (/^#[0-9A-F]{3}$/.test(s)) s = "#" + s.slice(1).split("").map((c) => c + c).join(""); return s; };

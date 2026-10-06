@@ -4,21 +4,22 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createStore } from "../server/store.mjs";
+import { createDiskStorage } from "../server/storage/disk.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 for (const d of ["tokens", "releases", "dist", "build"]) fs.rmSync(path.join(root, d), { recursive: true, force: true });
 fs.rmSync(path.join(root, "CHANGELOG.md"), { force: true });
 
 // Sample versions are not real publishes, so they stay out of Git history.
-const store = createStore(root, { commit: false });
+const store = createStore({ ...createDiskStorage(root), commit: async () => {} });
 const { E } = store;
 const base = E.withDefaults(E.BASE);
 const v12 = E.clone(base); v12.brands.northfield.primary = "#7A3F92"; v12.type.scale = 1.2; v12.shape.radius = 6; v12.comp.card.shadow = "none";
 const v13 = E.clone(base); v13.brands.northfield.primary = "#7A3F92"; v13.type.scale = 1.2;
 
-store.release(v12, "1.2.0", { date: "2026-08-04", who: "Design system team", note: "Added the employee screen size. Employee screens now fit more rows on one page." });
-store.release(v13, "1.3.0", { date: "2026-08-29", who: "Maya R. · Brand team", note: "Changed the Northfield main color to a deeper plum so white button words are easier to read." });
-store.release(base, "1.4.0", { date: "2026-09-18", who: "Maya R. · Brand team", note: "Made the card shadow softer and raised the type scale so headings stand out more on consumer screens." });
+await store.release(v12, "1.2.0", { date: "2026-08-04", who: "Design system team", note: "Added the employee screen size. Employee screens now fit more rows on one page." });
+await store.release(v13, "1.3.0", { date: "2026-08-29", who: "Maya R. · Brand team", note: "Changed the Northfield main color to a deeper plum so white button words are easier to read." });
+await store.release(base, "1.4.0", { date: "2026-09-18", who: "Maya R. · Brand team", note: "Made the card shadow softer and raised the type scale so headings stand out more on consumer screens." });
 
 // The draft: the official color sets for both brands, and a new body font.
 const d = E.clone(base);
@@ -29,6 +30,6 @@ Object.assign(d.brands.northfield, { primary: "#6A9835", secondary: "#88BC40", a
 d.type.body = "Atkinson Hyperlegible";
 d.type.ui = "Public Sans";
 Object.assign(d.comp.button, { track: "wide", pad: "roomy" });
-store.saveDraft(d);
-store.buildAll();
+await store.saveDraft(d);
+await store.buildAll();
 console.log("Sample data restored: versions 1.2.0, 1.3.0, 1.4.0 and a draft with 2 color sets.");
