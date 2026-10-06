@@ -7,7 +7,7 @@ This note is for the engineers who put the console online for the brand team. It
 - **Where things live.** The design system's files stay in GitHub, in the same folders as on your computer. The console reads them from one branch. Every publish is one commit on that branch, so `dist/`, `releases/`, and the change log update the same way as before.
 - **Unpublished changes** wait in a Durable Object (a small database Cloudflare keeps for the Worker) until someone publishes. They are not lost if the Worker restarts. Saving a draft never commits to GitHub.
 - **Sign-in.** Cloudflare Access signs people in with the company's identity provider. The Worker checks Access's signed token on every request, including the console page. Until Access is set up, the Worker refuses everything.
-- **Who did what.** Each version in the history shows the team from the "Viewing as" menu and the email of the person who signed in, like `Brand team · maya@company.com`.
+- **Who did what.** Each version in the history shows the email of the person who signed in, like `maya@company.com`. The top of the console shows who you are signed in as. Everyone is an admin for now; roles from Microsoft Entra ID groups come later.
 
 ## What you need
 
@@ -78,6 +78,14 @@ Every push to `main` deploys again, including the commits the console makes when
 6. Add both as repository variables, as in step 2, then run the **Deploy Worker** workflow again.
 
 Open the address again. Access asks you to sign in, then the console opens.
+
+**Signing in a small team without Cloudflare accounts.** New Zero Trust accounts sign people in with their Cloudflare login, so only members of your Cloudflare account get in. For a few people, a one-time PIN by email is simpler, and needs no accounts:
+
+1. In **Zero Trust > Integrations > Identity providers**, add **One-time PIN**.
+2. In the Access application's policy, set the **Include** rule to **Emails**, and list each person's address.
+3. Under the application's **Login methods**, allow **One-time PIN**.
+
+Do not set the Include rule to "Login methods: One-time PIN", or to "Emails ending in" a public domain like `@gmail.com`: both let in anyone who can get an email. If a PIN email does not arrive, ask your email admins to allow `noreply@notify.cloudflare.com`. When the company's Microsoft Entra ID is ready, add it as an identity provider and switch the policy to its groups.
 
 ## Free or paid
 

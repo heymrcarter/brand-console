@@ -181,7 +181,7 @@ The console runs on Cloudflare Workers, with the design system in a GitHub repos
 - Publishing the package to your company's package registry.
 - Connecting to your real shadcn components.
 
-Everyone who can sign in can do everything for now. Roles (Viewer, Editor, and Admin) are planned, with Microsoft Entra ID groups deciding who has which. Until then, the "Viewing as" menu only changes what the screen lets you edit.
+Everyone who can sign in can do everything for now, and the top of the console shows who you are signed in as. Roles (Viewer, Editor, and Admin) are planned, with Microsoft Entra ID groups deciding who has which.
 
 ---
 
