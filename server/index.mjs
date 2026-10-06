@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { createStore } from "./store.mjs";
 import { createFigma } from "./figma.mjs";
 import { createDiskStorage, createEnvSecrets } from "./storage/disk.mjs";
+import { createApi } from "./api.mjs";
+import { createAsk } from "./ask.mjs";
 import { readableStaticFile, isConsoleFile } from "./static.mjs";
 import { hostingConfig, refuseMessage, createAuth } from "./auth.mjs";
 
@@ -25,6 +27,7 @@ const storage = createDiskStorage(root);
 const store = createStore(storage);
 await store.buildAll();
 const figma = createFigma({ storage, secrets: createEnvSecrets(root), store, apiBase: process.env.FIGMA_API });
+const api = createApi({ store, figma, ask: createAsk({ key: KEY, model: MODEL }), info: () => ({ ai: !!KEY, model: MODEL, storybook: STORYBOOK, shared: auth.shared }) });
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf", ".otf": "font/otf" };
 
@@ -39,46 +42,10 @@ function send(res, code, body, type = "application/json", headers = {}) {
 function body(req) {
   return new Promise((ok, bad) => { let d = ""; req.on("data", (c) => { d += c; if (d.length > 20e6) req.destroy(); }); req.on("end", () => { try { ok(d ? JSON.parse(d) : {}); } catch { bad(Object.assign(new Error("The request was not valid JSON."), { status: 400 })); } }); });
 }
-async function state() {
-  const [draft, published, index, figmaStatus] = await Promise.all([store.draft(), store.published(), store.index(), figma.status()]);
-  return { draft, published, history: index.versions, ai: !!KEY, model: KEY ? MODEL : null, storybook: STORYBOOK, figma: figmaStatus, shared: auth.shared };
-}
-async function ask(turns) {
-  if (!KEY) { const e = new Error("No Claude API key is set. Add ANTHROPIC_API_KEY to the .env file."); e.status = 503; throw e; }
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-api-key": KEY, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({ model: MODEL, max_tokens: 1200, messages: turns }),
-  });
-  const j = await r.json();
-  if (!r.ok) { const e = new Error(j?.error?.message || `Claude returned an error (${r.status}).`); e.status = 502; throw e; }
-  return (j.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n");
-}
-
-const routes = {
-  "GET /api/state": async () => state(),
-  "PUT /api/draft": async (req) => { const b = await body(req); return store.saveDraft(b.draft); },
-  "POST /api/publish": async (req) => { const b = await body(req); const v = await store.publish(b); return { version: v, ...(await state()) }; },
-  "POST /api/rollback": async (req) => { const b = await body(req); const v = await store.rollback(b); return { version: v, ...(await state()) }; },
-  "POST /api/flag": async (req) => { const b = await body(req); return { flag: await store.flag(b.version), history: (await store.index()).versions }; },
-  "POST /api/ask": async (req) => { const b = await body(req); return { text: await ask(b.turns || []) }; },
-  "GET /api/health": async () => ({ ok: true }),
-  "POST /api/fonts": async (req) => { const b = await body(req); return store.saveFont(b); },
-  "GET /api/figma": async () => figma.status(),
-  "POST /api/figma/connect": async (req) => figma.connect(await body(req)),
-  "POST /api/figma/link": async (req) => figma.setLink(await body(req)),
-  "POST /api/figma/disconnect": async (req) => figma.disconnect(await body(req)),
-  "POST /api/figma/compare": async (req) => figma.compare(await body(req)),
-  "POST /api/figma/apply": async (req) => { const r = await figma.apply(await body(req)); return { ...r, ...(await state()) }; },
-  "GET /api/figma/files": async () => figma.exportFiles(),
-  "POST /api/figma/files/compare": async (req) => figma.compareFiles(await body(req)),
-  "POST /api/figma/files/apply": async (req) => { const r = await figma.applyFiles(await body(req)); return { ...r, ...(await state()) }; },
-};
-
 async function handle(req, res) {
   let url;
   try { url = new URL(req.url, "http://localhost"); } catch { return send(res, 400, "Bad request", "text/plain"); }
-  const route = routes[`${req.method} ${url.pathname}`];
+  const route = api.has(req.method, url.pathname);
   // Only the console itself may change things. Other web pages cannot send changes to this computer.
   if ((route || url.pathname === "/api/login" || url.pathname === "/api/logout") && req.method !== "GET" && !auth.originAllowed(req)) {
     return send(res, 403, { error: "Only the Brand Console can make changes here." });
@@ -93,7 +60,7 @@ async function handle(req, res) {
     return url.pathname.startsWith("/api/") ? send(res, 401, { error: "Sign in with your team's access code first.", signIn: true }) : send(res, 401, "Sign in first.", "text/plain");
   }
   if (route) {
-    try { send(res, 200, await route(req)); }
+    try { send(res, 200, await api.call(req.method, url.pathname, req.method === "GET" ? {} : await body(req))); }
     catch (e) { send(res, e.status || 500, { error: e.message || "Something went wrong." }); if (!e.status) console.error(e); }
     return;
   }
