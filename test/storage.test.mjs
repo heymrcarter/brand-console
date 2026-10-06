@@ -193,6 +193,24 @@ test("github storage: one commit holds every pending change, with text inline an
   assert.equal(mock.log().length, 2);
 });
 
+test("github storage: a font is uploaded once however many copies a publish makes, and never again once it is on GitHub", async () => {
+  const { mock, storage } = github({ "README.md": "hi" });
+  const font = Uint8Array.from({ length: 500 }, (_, i) => (i * 13) % 256);
+  for (const p of ["fonts/a.woff2", "dist/fonts/a.woff2", "releases/v1.0.0/fonts/a.woff2", "build/draft/fonts/a.woff2"]) await storage.write(p, font);
+  mock.calls.length = 0;
+  await storage.commit("First publish with the font");
+  assert.equal(writesOf(mock.calls, "POST /repos/acme/design-system/git/blobs"), 1, "four copies, one upload");
+  for (const p of ["fonts/a.woff2", "dist/fonts/a.woff2", "releases/v1.0.0/fonts/a.woff2", "build/draft/fonts/a.woff2"]) assert.deepEqual(mock.files()[p], font, `${p} is the font`);
+  // The next publish copies the same font into a new release folder.
+  const later = createGitHubStorage({ repo: REPO, token: "test-token", pending: createMemoryStorage(), fetch: mock.fetch });
+  await later.write("releases/v1.1.0/fonts/a.woff2", font);
+  await later.write("dist/fonts/a.woff2", font);
+  mock.calls.length = 0;
+  await later.commit("Second publish");
+  assert.equal(writesOf(mock.calls, "POST /repos/acme/design-system/git/blobs"), 0, "the font is already on GitHub, so nothing is uploaded");
+  assert.deepEqual(mock.files()["releases/v1.1.0/fonts/a.woff2"], font);
+});
+
 test("github storage: pending changes last between requests, so a restarted Worker still commits them", async () => {
   const shared = createMemoryStorage();
   const first = github({ "tokens/a.json": "old" }, { pending: shared });

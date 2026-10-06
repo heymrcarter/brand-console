@@ -7,7 +7,9 @@
 //
 // It only uses fetch, so it runs in Node and in a Cloudflare Worker. A Worker request on the free plan can make
 // at most 50 outgoing requests, so it keeps the count low:
-// - Text files go inside the one request that makes the commit's tree. Only binary files (fonts) are uploaded first.
+// - Text files go inside the one request that makes the commit's tree. Only binary files (fonts) are uploaded first,
+//   once per file content: a font copied to fonts/, dist/, and a release folder is one upload, and a font that is
+//   already on GitHub is not uploaded again. Git names a file by the SHA-1 of its content, so this works it out itself.
 // - Files read from GitHub are kept by their Git hash. A Git object never changes, so they never go out of date.
 // - The branch's latest commit is checked at most every headMaxAgeMs, so reading a draft's dozen files costs one check.
 import { storageKey, storagePrefix, underPrefix } from "./storage.mjs";
@@ -19,6 +21,12 @@ const DELETED = `${RESERVED}/deleted/`;
 const plainErr = (status, message) => Object.assign(new Error(message), { status });
 const bytesToBase64 = (bytes) => { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); };
 const base64ToBytes = (b64) => Uint8Array.from(atob(String(b64).replace(/\s+/g, "")), (c) => c.charCodeAt(0));
+// The name Git gives a file's content, so a file already on GitHub is never uploaded again.
+async function gitBlobSha(bytes) {
+  const head = new TextEncoder().encode(`blob ${bytes.length}\0`), all = new Uint8Array(head.length + bytes.length);
+  all.set(head); all.set(bytes, head.length);
+  return [...new Uint8Array(await crypto.subtle.digest("SHA-1", all))].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 const sameData = (a, b) => (typeof a === "string" || typeof b === "string") ? a === b : a.length === b.length && a.every((x, i) => x === b[i]);
 
 /**
@@ -32,7 +40,7 @@ export function createGitHubStorage({ repo, branch = "main", token, pending, aut
   if (!pending) throw new Error("GitHub storage needs a pending storage to hold changes until they are committed.");
   const api = apiBase.replace(/\/$/, "") + "/repos/" + repo;
   const refPath = "heads/" + branch.split("/").map(encodeURIComponent).join("/");
-  const blobs = new Map(), trees = new Map();
+  const blobs = new Map(), trees = new Map(), uploaded = new Set();
   let head = null; // { commit, tree, at }
 
   async function gh(method, path, body) {
@@ -106,7 +114,16 @@ export function createGitHubStorage({ repo, branch = "main", token, pending, aut
       try { s = new TextDecoder("utf-8", { fatal: true }).decode(bytes); } catch { /* Not text. */ }
       if (s !== null && !s.includes("\0")) text.set(p, s); else binary.set(p, bytes);
     }
-    const uploaded = new Map(await Promise.all([...binary].map(async ([p, bytes]) => [p, (await gh("POST", "/git/blobs", { content: bytesToBase64(bytes), encoding: "base64" })).sha])));
+    const shas = new Map(await Promise.all([...binary].map(async ([p, bytes]) => [p, await gitBlobSha(bytes)])));
+    if (shas.size) {
+      const onGitHub = new Set([...(await files((await latest()).tree)).values()].map((e) => e.sha));
+      const missing = new Map([...shas].filter(([, sha]) => !onGitHub.has(sha) && !uploaded.has(sha) && !blobs.has(sha)).map(([p, sha]) => [sha, binary.get(p)]));
+      await Promise.all([...missing].map(async ([sha, bytes]) => {
+        const got = (await gh("POST", "/git/blobs", { content: bytesToBase64(bytes), encoding: "base64" })).sha;
+        if (got !== sha) throw plainErr(502, "GitHub saved a file under a different name than Git would. The repository may use SHA-256, which this storage does not support.");
+        uploaded.add(sha);
+      }));
+    }
 
     // If someone else moves the branch while this runs, GitHub refuses the update. Build the commit again on top of theirs.
     for (let attempt = 1; ; attempt++) {
@@ -114,7 +131,7 @@ export function createGitHubStorage({ repo, branch = "main", token, pending, aut
       const mode = (p) => (have.get(p) || {}).mode || "100644";
       const tree = [
         ...[...text].map(([path, content]) => ({ path, mode: mode(path), type: "blob", content })),
-        ...[...uploaded].map(([path, sha]) => ({ path, mode: mode(path), type: "blob", sha })),
+        ...[...shas].map(([path, sha]) => ({ path, mode: mode(path), type: "blob", sha })),
         ...deletes.filter((p) => have.has(p) && !data.has(p)).map((path) => ({ path, mode: mode(path), type: "blob", sha: null })),
       ];
       const newTree = (await gh("POST", "/git/trees", { base_tree: base.tree, tree })).sha;
