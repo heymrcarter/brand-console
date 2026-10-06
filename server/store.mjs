@@ -12,7 +12,7 @@ export function createStore(root) {
   const E = loadEngine(root);
   const P = (...a) => path.join(root, ...a);
   const readJson = (f) => JSON.parse(fs.readFileSync(f, "utf8"));
-  const writeFile = (f, data) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, typeof data === "string" ? data : JSON.stringify(data, null, 2) + "\n"); };
+  const writeFile = (f, data) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, typeof data === "string" || Buffer.isBuffer(data) ? data : JSON.stringify(data, null, 2) + "\n"); };
 
   function readTokenDir(dir) {
     const out = {};

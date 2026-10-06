@@ -232,6 +232,7 @@ test("file names and Figma's color formats are understood", () => {
 test("uploaded fonts reach theme.css, settings.json, and the outputs folder", () => {
   const saved = store.saveFont({ family: "Avenir Next", weight: 400, style: "normal", fileName: "AvenirNext-Regular.woff2", data: Buffer.alloc(400, 7).toString("base64") });
   assert.equal(saved.file, "fonts/avenir-next-400.woff2");
+  assert.deepEqual(fs.readFileSync(path.join(root, saved.file)), Buffer.alloc(400, 7), "the font file is saved as it was sent, not as text");
   assert.throws(() => store.saveFont({ family: "X", fileName: "x.exe", data: "AAAA" }), /\.woff2/);
   const d = store.draft();
   d.fontLib = { files: { "Avenir Next": [{ file: saved.file, weight: 400, style: "normal" }] }, added: [{ name: "Nunito", cat: "sans", role: "best", source: "google", axes: "wght@400;700" }], removed: ["Merriweather"] };
