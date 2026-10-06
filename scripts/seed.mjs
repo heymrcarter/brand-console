@@ -9,7 +9,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 for (const d of ["tokens", "releases", "dist", "build"]) fs.rmSync(path.join(root, d), { recursive: true, force: true });
 fs.rmSync(path.join(root, "CHANGELOG.md"), { force: true });
 
-const store = createStore(root);
+// Sample versions are not real publishes, so they stay out of Git history.
+const store = createStore(root, { commit: false });
 const { E } = store;
 const base = E.withDefaults(E.BASE);
 const v12 = E.clone(base); v12.brands.northfield.primary = "#7A3F92"; v12.type.scale = 1.2; v12.shape.radius = 6; v12.comp.card.shadow = "none";

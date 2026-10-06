@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -103,5 +104,21 @@ test("publish takes a bump, and refuses one it does not know", () => {
   edit((d) => { d.shape.radius = 6; });
   assert.equal(store.publish({ note: "New look.", bump: "major" }), "2.0.0");
   assert.equal(store.rollback({ version: "1.4.1", who: "Test" }), "2.1.0", "a rollback is a minor version");
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test("publishing makes a Git commit when the project uses Git, even with no fonts folder", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dsc-git-"));
+  const git = (...a) => execFileSync("git", a, { cwd: tmp, encoding: "utf8" });
+  git("init", "-q"); git("config", "user.name", "Test"); git("config", "user.email", "test@example.com");
+  git("commit", "-q", "--allow-empty", "-m", "Start");
+  const store = createStore(tmp);
+  store.release(E.withDefaults(E.BASE), "1.0.0", { note: "First version." });
+  assert.ok(!fs.existsSync(path.join(tmp, "fonts")), "this project has no uploaded fonts");
+  // The commit runs in the background, so wait for it.
+  let log = "";
+  for (let i = 0; i < 50 && !log.includes("v1.0.0"); i++) { await new Promise((ok) => setTimeout(ok, 100)); log = git("log", "--format=%s"); }
+  assert.match(log, /Publish design system v1\.0\.0/);
+  assert.equal(git("status", "--porcelain", "tokens", "releases", "dist", "CHANGELOG.md"), "", "everything the publish wrote is committed");
   fs.rmSync(tmp, { recursive: true, force: true });
 });

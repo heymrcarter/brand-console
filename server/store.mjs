@@ -8,7 +8,8 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { loadEngine } from "./engine.mjs";
 
-export function createStore(root) {
+// commit: false keeps publishes out of Git history, for scripts like the sample-data reset.
+export function createStore(root, { commit = true } = {}) {
   const E = loadEngine(root);
   const P = (...a) => path.join(root, ...a);
   const readJson = (f) => JSON.parse(fs.readFileSync(f, "utf8"));
@@ -135,8 +136,10 @@ export function createStore(root) {
     x.flag = !x.flag; saveIndex(ix); return x.flag;
   }
   function gitCommit(msg) {
-    if (!fs.existsSync(P(".git"))) return;
-    execFile("git", ["add", "tokens", "releases", "dist", "fonts", "CHANGELOG.md"], { cwd: root }, (err) => {
+    if (!commit || !fs.existsSync(P(".git"))) return;
+    // git add stops if any path is missing, so only name the ones this project has. A project with no uploaded fonts has no fonts folder.
+    const paths = ["tokens", "releases", "dist", "fonts", "CHANGELOG.md"].filter((p) => fs.existsSync(P(p)));
+    execFile("git", ["add", ...paths], { cwd: root }, (err) => {
       if (!err) execFile("git", ["commit", "-m", msg], { cwd: root }, () => {});
     });
   }
