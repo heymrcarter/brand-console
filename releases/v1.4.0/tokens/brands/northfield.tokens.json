@@ -1,0 +1,152 @@
+{
+  "$description": "Northfield brand colors. Only this file changes between brands.",
+  "$extensions": {
+    "org.brand-console": {
+      "name": "Northfield",
+      "division": "Consumer division",
+      "wordsOnMainColor": "white"
+    }
+  },
+  "color": {
+    "$type": "color",
+    "brand": {
+      "primary": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.4196,
+            0.1804,
+            0.5137
+          ],
+          "hex": "#6b2e83"
+        },
+        "$description": "Main color. Used for buttons, links, and the keyboard focus outline."
+      },
+      "secondary": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.1843,
+            0.3647,
+            0.5412
+          ],
+          "hex": "#2f5d8a"
+        },
+        "$description": "Second color. Used for tags, badges, and selected rows."
+      },
+      "accent": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.851,
+            0.3961,
+            0.2314
+          ],
+          "hex": "#d9653b"
+        },
+        "$description": "Accent color. Used for small touches like logos and charts. Never for words."
+      }
+    },
+    "surface": {
+      "$description": "Page and window backgrounds for light and dark mode. Picked from the brand's color set.",
+      "light": {
+        "page": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              1,
+              1,
+              1
+            ],
+            "hex": "#ffffff"
+          },
+          "$description": "The page background.",
+          "$extensions": {
+            "org.brand-console": {
+              "automatic": true
+            }
+          }
+        },
+        "card": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              1,
+              1,
+              1
+            ],
+            "hex": "#ffffff"
+          },
+          "$description": "Windows, cards, and pop-ups.",
+          "$extensions": {
+            "org.brand-console": {
+              "automatic": true
+            }
+          }
+        },
+        "window-opacity": {
+          "$type": "number",
+          "$value": 1,
+          "$description": "How solid windows and cards are. 1 is fully solid."
+        },
+        "window-blur": {
+          "$type": "dimension",
+          "$value": {
+            "value": 0,
+            "unit": "px"
+          },
+          "$description": "How much windows blur what is behind them."
+        }
+      },
+      "dark": {
+        "page": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0.1373,
+              0.0235,
+              0.1804
+            ],
+            "hex": "#23062e"
+          },
+          "$description": "The page background.",
+          "$extensions": {
+            "org.brand-console": {
+              "automatic": true
+            }
+          }
+        },
+        "card": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0.0588,
+              0.1765,
+              0.2863
+            ],
+            "hex": "#0f2d49"
+          },
+          "$description": "Windows, cards, and pop-ups.",
+          "$extensions": {
+            "org.brand-console": {
+              "automatic": true
+            }
+          }
+        },
+        "window-opacity": {
+          "$type": "number",
+          "$value": 1,
+          "$description": "How solid windows and cards are. 1 is fully solid."
+        },
+        "window-blur": {
+          "$type": "dimension",
+          "$value": {
+            "value": 0,
+            "unit": "px"
+          },
+          "$description": "How much windows blur what is behind them."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,952 @@
+{
+  "$description": "Settings and AI guidance for every component. Settings are kept in $extensions because they are choices, not raw values.",
+  "component": {
+    "button": {
+      "$description": "People press buttons to do something, like save or pay.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Button",
+          "category": "actions",
+          "level": "Primitive",
+          "settings": {
+            "bg": "action.primary",
+            "radius": "md",
+            "weight": 600,
+            "case": "sentence",
+            "track": "wide",
+            "pad": "roomy"
+          },
+          "guidance": "Use one main (primary) button for the most important action on a screen. Use the outline button for Cancel or Back. Write the label as a short action that says what will happen, like \"Save my changes.\" Keep the label on one line. Do not use a button to go to another website. Use a link instead."
+        }
+      }
+    },
+    "icon-button": {
+      "$description": "A small button that shows only a picture, like a trash can or a close X.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Icon button",
+          "category": "actions",
+          "level": "Primitive",
+          "settings": {
+            "shape": "md",
+            "showLabel": "yes"
+          },
+          "guidance": "Only use an icon button when the picture is very common, like X for close or a trash can for delete. Always give it a label. When there is room, show the label as a word too."
+        }
+      }
+    },
+    "button-group": {
+      "$description": "A few buttons joined together. People pick one, like Day, Week, or Month.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Button group",
+          "category": "actions",
+          "level": "Component",
+          "settings": {
+            "selected": "soft"
+          },
+          "guidance": "Use a button group to switch between views of the same thing. Keep it to five choices or fewer. For choices in a form, use radio buttons instead."
+        }
+      }
+    },
+    "link": {
+      "$description": "Words people click to go to another page. Includes action links and back links.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Link",
+          "category": "actions",
+          "level": "Primitive",
+          "settings": {
+            "underline": "always",
+            "weight": 600
+          },
+          "guidance": "Use a link to go somewhere. Use a button to do something. Use an action link, not a button, to start a main task from a page, like 'Find a doctor'. Never write 'click here'."
+        }
+      }
+    },
+    "field": {
+      "$description": "A box where people type, with a label and help text.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Text field",
+          "category": "inputs",
+          "level": "Component",
+          "settings": {
+            "border": "border.strong",
+            "radius": "md",
+            "labelWeight": 600
+          },
+          "guidance": "Every field needs a label above it. Put help text under the field, not inside it as gray placeholder text. When something is wrong, say what is wrong and how to fix it, in one sentence."
+        }
+      }
+    },
+    "textarea": {
+      "$description": "A big box for longer answers, like a note to a doctor. It can count characters.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Text area",
+          "category": "inputs",
+          "level": "Component",
+          "settings": {
+            "rows": 5,
+            "count": "show"
+          },
+          "guidance": "Use a text area when the answer may be more than one line. Tell people how much to write. If there is a limit, show the count so they are not surprised."
+        }
+      }
+    },
+    "select": {
+      "$description": "A list people open to pick one choice.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Select",
+          "category": "inputs",
+          "level": "Component",
+          "settings": {
+            "radius": "md",
+            "menuShadow": "soft"
+          },
+          "guidance": "Use a dropdown when there are 5 to 15 choices. For 2 to 4 choices, show them all as radio buttons instead. Sort choices in an order people expect, like by date or A to Z."
+        }
+      }
+    },
+    "checkbox": {
+      "$description": "A small box people tick. They can pick more than one.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Checkbox",
+          "category": "inputs",
+          "level": "Primitive",
+          "settings": {
+            "size": 1.6,
+            "radius": "sm"
+          },
+          "guidance": "Use checkboxes when people can pick more than one choice, or to agree to something. Put each choice on its own line. Never start with a box already ticked for anything that costs money or shares data."
+        }
+      }
+    },
+    "radio": {
+      "$description": "A list of round buttons. People pick only one choice.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Radio buttons",
+          "category": "inputs",
+          "level": "Primitive",
+          "settings": {
+            "style": "tiles"
+          },
+          "guidance": "Use radio buttons when people must pick exactly one of 2 to 6 choices. Show every choice, do not hide them in a dropdown. For Yes and No questions, put Yes first."
+        }
+      }
+    },
+    "switch": {
+      "$description": "An on and off control that works right away, like turning on text reminders.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Switch",
+          "category": "inputs",
+          "level": "Primitive",
+          "settings": {
+            "stateText": "yes"
+          },
+          "guidance": "Use a switch only for settings that take effect right away. Inside a form that has a Submit button, use a checkbox instead."
+        }
+      }
+    },
+    "combobox": {
+      "$description": "A box that shows matches as people type, like finding a medicine or a doctor.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Combobox (search and pick)",
+          "category": "inputs",
+          "level": "Composite",
+          "settings": {
+            "match": "bold",
+            "min": 2
+          },
+          "guidance": "Use a combobox when there are too many choices for a dropdown, like medicines, doctors, or cities. Forgive spelling mistakes. Show 'No matches' with a next step when nothing is found."
+        }
+      }
+    },
+    "search": {
+      "$description": "A box to search the site or a list.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Search field",
+          "category": "inputs",
+          "level": "Component",
+          "settings": {
+            "button": "text"
+          },
+          "guidance": "Put site search in the header. Show what people searched for and how many results there are. Keep their words in the box after they search."
+        }
+      }
+    },
+    "date-input": {
+      "$description": "Three small boxes for month, day, and year. Use it for dates people know, like a birth date.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Date input (known date)",
+          "category": "inputs",
+          "level": "Component",
+          "settings": {
+            "labels": "words"
+          },
+          "guidance": "Use this for dates people already know, like a birth date or the date a card was issued. Never make people scroll back years in a calendar. Use the date picker only for dates they need to choose, like an appointment."
+        }
+      }
+    },
+    "date-picker": {
+      "$description": "A date box with a small calendar that pops open. Use it for picking a new date, like an appointment.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Date picker",
+          "category": "inputs",
+          "level": "Composite",
+          "settings": {
+            "weekStart": "sun",
+            "day": "pill"
+          },
+          "guidance": "Use a date picker for picking a new date within a few months, like a visit or a delivery. Always let people type the date too. Turn off days that cannot be picked and say why. For birth dates, use the date input."
+        }
+      }
+    },
+    "time-picker": {
+      "$description": "A list of times to pick from, like 10:30 AM.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Time picker",
+          "category": "inputs",
+          "level": "Component",
+          "settings": {
+            "step": 30
+          },
+          "guidance": "Use 12-hour time with AM and PM. Only show times that can be picked. For appointments, show open times as buttons with the appointment slot picker instead."
+        }
+      }
+    },
+    "masked": {
+      "$description": "Boxes that help people type things in the right shape, like a phone number, ZIP code, or member ID.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Formatted fields",
+          "category": "inputs",
+          "level": "Component",
+          "settings": {
+            "format": "hint"
+          },
+          "guidance": "Accept numbers typed any way, with or without dashes or spaces, and fix the format for people. Never ask for a full Social Security number when the last 4 digits will do."
+        }
+      }
+    },
+    "number": {
+      "$description": "Boxes for amounts, like how many refills or how much to pay.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Number and money",
+          "category": "inputs",
+          "level": "Component",
+          "settings": {
+            "stepper": "show"
+          },
+          "guidance": "Show the dollar sign outside the box so people do not have to type it. Use plus and minus buttons for small counts. Say the limits in the help text."
+        }
+      }
+    },
+    "file-upload": {
+      "$description": "A place to add files, like a photo of a bill or a letter from a doctor.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "File upload",
+          "category": "inputs",
+          "level": "Composite",
+          "settings": {
+            "style": "drop"
+          },
+          "guidance": "Say which file types and sizes are OK before people pick a file. On phones, let people take a photo. Show each file with a way to remove it."
+        }
+      }
+    },
+    "label-hint": {
+      "$description": "The words above a field that say what to type, and the smaller words that help.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Label and help text",
+          "category": "structure",
+          "level": "Primitive",
+          "settings": {
+            "mark": "optional"
+          },
+          "guidance": "Write labels as short, plain questions or nouns. Put help text under the label, before the box. Mark the optional fields with the word '(optional)'."
+        }
+      }
+    },
+    "error-message": {
+      "$description": "Red words under a field that say what is wrong and how to fix it.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Error message",
+          "category": "structure",
+          "level": "Primitive",
+          "settings": {
+            "icon": "show"
+          },
+          "guidance": "Write one short sentence that says how to fix the problem, like 'Enter a ZIP code with 5 numbers.' Do not blame the person. Do not say 'invalid'."
+        }
+      }
+    },
+    "fieldset": {
+      "$description": "A group of fields that answer one question, like an address.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Fieldset (question group)",
+          "category": "structure",
+          "level": "Component",
+          "settings": {
+            "legend": "h3"
+          },
+          "guidance": "Group fields that belong to one question, like the parts of an address or a date. Write the legend as the question."
+        }
+      }
+    },
+    "error-summary": {
+      "$description": "A box at the top of a form that lists every problem, with links to each one.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Error summary",
+          "category": "structure",
+          "level": "Component",
+          "settings": {
+            "border": 4
+          },
+          "guidance": "Show the error summary at the top when someone sends a form with problems. Use the same words as the error under each field. Move focus to it."
+        }
+      }
+    },
+    "alert": {
+      "$description": "A message inside the page that tells people something important.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Alert",
+          "category": "feedback",
+          "level": "Component",
+          "settings": {
+            "style": "soft"
+          },
+          "guidance": "Use alerts for things people need to know on this page. Start with the most important words. Say what to do next. Do not stack more than two."
+        }
+      }
+    },
+    "banner": {
+      "$description": "A strip across the top of the page for news that affects everyone.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Notification banner",
+          "category": "feedback",
+          "level": "Component",
+          "settings": {
+            "tone": "info"
+          },
+          "guidance": "Use one banner at a time, for news that matters to everyone, like a service outage or open enrollment. Keep it to one sentence and one link."
+        }
+      }
+    },
+    "toast": {
+      "$description": "A short message that pops up after an action, like 'Saved'. It can offer Undo.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Toast",
+          "category": "feedback",
+          "level": "Component",
+          "settings": {
+            "duration": 10
+          },
+          "guidance": "Use a toast to confirm something worked. Keep it to a few words. Never put an error or anything people must read in a toast."
+        }
+      }
+    },
+    "progress": {
+      "$description": "A bar that fills up to show how much is done.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Progress bar",
+          "category": "feedback",
+          "level": "Primitive",
+          "settings": {
+            "height": 12
+          },
+          "guidance": "Always show words with the bar, like 'Step 2 of 4' or '60% uploaded'. For steps with names, use the step list."
+        }
+      }
+    },
+    "spinner": {
+      "$description": "A turning circle that says 'please wait'.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Spinner",
+          "category": "feedback",
+          "level": "Primitive",
+          "settings": {
+            "words": "yes"
+          },
+          "guidance": "Show a spinner only if waiting takes more than 1 second. Say what is loading. If it takes more than 10 seconds, show a progress bar instead."
+        }
+      }
+    },
+    "skeleton": {
+      "$description": "Gray shapes that show where things will appear while the page loads.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Loading placeholder (skeleton)",
+          "category": "feedback",
+          "level": "Primitive",
+          "settings": {
+            "pulse": "on"
+          },
+          "guidance": "Use loading shapes when you know the layout of what is coming, like a list of claims. Match the shapes to the real content."
+        }
+      }
+    },
+    "empty-state": {
+      "$description": "What a page shows when there is nothing there yet, with a next step.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Empty state",
+          "category": "feedback",
+          "level": "Component",
+          "settings": {
+            "icon": "show"
+          },
+          "guidance": "Say why the page is empty and what people can do next. Give one main action. Do not use jokes."
+        }
+      }
+    },
+    "timeout": {
+      "$description": "A message that warns people before they are signed out, so they do not lose their work.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Session timeout warning",
+          "category": "feedback",
+          "level": "Composite",
+          "settings": {
+            "warn": 5
+          },
+          "guidance": "Warn people before a timeout and let them stay signed in with one click. Save what they typed so nothing is lost if they are signed out."
+        }
+      }
+    },
+    "card": {
+      "$description": "A box that groups things that belong together.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Card",
+          "category": "content",
+          "level": "Component",
+          "settings": {
+            "radius": "lg",
+            "shadow": "soft",
+            "border": "on"
+          },
+          "guidance": "Use a card to group things that belong together, like one account or one order. Do not put a card inside another card. Keep one main action per card."
+        }
+      }
+    },
+    "badge": {
+      "$description": "A small label that shows a status, like 'In network' or 'Due soon'.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Badge and tag",
+          "category": "content",
+          "level": "Primitive",
+          "settings": {
+            "shape": "pill"
+          },
+          "guidance": "Use badges for short statuses. One to three words. Use the same words for the same status everywhere, like 'Due soon' and never 'Due shortly'."
+        }
+      }
+    },
+    "avatar": {
+      "$description": "A small picture or initials that stand for a person, like your doctor.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Avatar",
+          "category": "content",
+          "level": "Primitive",
+          "settings": {
+            "shape": "pill"
+          },
+          "guidance": "Show a photo when you have one. Otherwise show initials. Always show the name next to it."
+        }
+      }
+    },
+    "accordion": {
+      "$description": "A list of headings that open to show more, like questions and answers.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Accordion",
+          "category": "content",
+          "level": "Component",
+          "settings": {
+            "icon": "chevron"
+          },
+          "guidance": "Use an accordion to hide details most people do not need, like frequently asked questions. Never hide the most important information in one."
+        }
+      }
+    },
+    "summary-list": {
+      "$description": "Rows of labels and answers, with a Change link. Use it on review pages.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Summary list",
+          "category": "content",
+          "level": "Component",
+          "settings": {
+            "lines": "on"
+          },
+          "guidance": "Use a summary list to show answers before people submit. Give each row its own Change link that goes back to that question."
+        }
+      }
+    },
+    "callout": {
+      "$description": "Text set apart from the page, for a key point or a safety warning.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Inset text and warning",
+          "category": "content",
+          "level": "Component",
+          "settings": {
+            "weight": 4
+          },
+          "guidance": "Use inset text for one key point. Use the warning callout for safety information, like when to call 911."
+        }
+      }
+    },
+    "divider": {
+      "$description": "A thin line that separates parts of a page.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Divider",
+          "category": "content",
+          "level": "Primitive",
+          "settings": {
+            "weight": 1
+          },
+          "guidance": "Use space before you use a line. Add a divider only when two parts of a page could be confused."
+        }
+      }
+    },
+    "tooltip": {
+      "$description": "A small note that appears when people point at or focus on something.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Tooltip",
+          "category": "content",
+          "level": "Primitive",
+          "settings": {
+            "tone": "dark"
+          },
+          "guidance": "Use tooltips only for short names of icons. Never put important information in a tooltip, because people on phones cannot see it. Use the help drawer for explanations."
+        }
+      }
+    },
+    "popover": {
+      "$description": "A small box that opens next to a button, with a bit more information or a few actions.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Popover",
+          "category": "content",
+          "level": "Component",
+          "settings": {},
+          "guidance": "Use a popover for a short explanation or a few actions tied to one button. For longer help, use the help drawer."
+        }
+      }
+    },
+    "icon": {
+      "$description": "Small pictures that help people scan, like a phone or a calendar.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Icon",
+          "category": "content",
+          "level": "Primitive",
+          "settings": {
+            "stroke": 2
+          },
+          "guidance": "Use icons next to words, not instead of them. Use the same icon for the same idea everywhere."
+        }
+      }
+    },
+    "header": {
+      "$description": "The strip at the top of every page, with the logo, main links, and account.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Header",
+          "category": "navigation",
+          "level": "Composite",
+          "settings": {
+            "style": "white",
+            "phone": "yes"
+          },
+          "guidance": "Use the same header on every page. Keep five main links or fewer. On consumer screens, show the phone number."
+        }
+      }
+    },
+    "footer": {
+      "$description": "The bottom of every page, with help, legal links, and the phone number.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Footer",
+          "category": "navigation",
+          "level": "Composite",
+          "settings": {
+            "style": "light"
+          },
+          "guidance": "Put help, contact, privacy, and nondiscrimination notices in the footer. Show the phone number and hours."
+        }
+      }
+    },
+    "side-nav": {
+      "$description": "A list of links down the side of the page, for moving around a section.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Side navigation",
+          "category": "navigation",
+          "level": "Component",
+          "settings": {
+            "current": "fill"
+          },
+          "guidance": "Use side navigation for sections with more than five pages, mostly on employee screens. Keep two levels at most."
+        }
+      }
+    },
+    "tabs": {
+      "$description": "A row of labels that switch between views on the same page.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Tabs",
+          "category": "navigation",
+          "level": "Component",
+          "settings": {
+            "style": "line"
+          },
+          "guidance": "Use tabs to switch between related views, like Medical and Pharmacy claims. Do not use tabs for steps in a process."
+        }
+      }
+    },
+    "breadcrumbs": {
+      "$description": "A trail of links that shows where you are, like Home, then My plan, then Claims.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Breadcrumbs",
+          "category": "navigation",
+          "level": "Component",
+          "settings": {
+            "sep": "chevron"
+          },
+          "guidance": "Use breadcrumbs on pages that are three or more levels deep. On phones, show only the link one level up."
+        }
+      }
+    },
+    "pagination": {
+      "$description": "Links to move between pages of a long list.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Pagination",
+          "category": "navigation",
+          "level": "Component",
+          "settings": {
+            "style": "numbers"
+          },
+          "guidance": "Say how many items there are, like 'Showing 1 to 20 of 240'. Always spell out Previous and Next."
+        }
+      }
+    },
+    "stepper": {
+      "$description": "Shows the steps of a task, which ones are done, and which one is next.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Step list",
+          "category": "navigation",
+          "level": "Composite",
+          "settings": {
+            "dir": "col"
+          },
+          "guidance": "Use a step list for tasks with 3 to 6 named steps, like signing up. Let people go back to finished steps. Save their answers as they go."
+        }
+      }
+    },
+    "skip-link": {
+      "$description": "A hidden link that appears when people use the Tab key. It jumps past the header.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Skip link",
+          "category": "navigation",
+          "level": "Primitive",
+          "settings": {},
+          "guidance": "Put a skip link at the very top of every page. It shows only when it has keyboard focus."
+        }
+      }
+    },
+    "menu": {
+      "$description": "A list of actions that opens from a button, like Edit, Print, or Delete.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Menu",
+          "category": "navigation",
+          "level": "Component",
+          "settings": {},
+          "guidance": "Use a menu for extra actions. Put the most used action first and anything that deletes last, in red, after a line."
+        }
+      }
+    },
+    "dialog": {
+      "$description": "A small window that asks a question before going on.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Pop-up (dialog)",
+          "category": "overlays",
+          "level": "Composite",
+          "settings": {
+            "radius": "lg",
+            "overlay": 50,
+            "order": "end"
+          },
+          "guidance": "Only use a pop-up when the person must decide something before going on, like confirming a delete. The title asks the question. The main button repeats the action, like \"Delete this address,\" not \"OK.\""
+        }
+      }
+    },
+    "drawer": {
+      "$description": "A panel that slides in from the side, for a form or details without leaving the page.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Drawer",
+          "category": "overlays",
+          "level": "Composite",
+          "settings": {
+            "side": "right",
+            "width": "narrow"
+          },
+          "guidance": "Use a drawer for a short task or details about one item, like editing one claim. Use a full page for anything long."
+        }
+      }
+    },
+    "help-drawer": {
+      "$description": "A panel that explains a hard word or rule in plain words, without leaving the page.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Help drawer",
+          "category": "overlays",
+          "level": "Composite",
+          "settings": {},
+          "guidance": "Use a help drawer for insurance words people may not know, like deductible or prior authorization. Explain them in one or two short paragraphs, with an example."
+        }
+      }
+    },
+    "data-table": {
+      "$description": "A table for lots of rows, with sorting, filters, row picking, and pages. Most used on employee screens.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Data table",
+          "category": "data",
+          "level": "Composite",
+          "settings": {
+            "stripes": "off",
+            "header": "tinted"
+          },
+          "guidance": "Use a data table to compare many rows. Right-align numbers and money. Let people sort and filter. On phones, show a list of cards instead when there are more than 4 columns."
+        }
+      }
+    },
+    "list": {
+      "$description": "A simple list of items, like recent claims, each with a link to more.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "List",
+          "category": "data",
+          "level": "Component",
+          "settings": {
+            "lines": "on"
+          },
+          "guidance": "Use a list for a few items people scan, like recent claims. On phones, use a list instead of a wide table."
+        }
+      }
+    },
+    "filter-chips": {
+      "$description": "Small buttons that turn filters on and off, like 'In network' or 'Accepting new patients'.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Filter chips",
+          "category": "data",
+          "level": "Component",
+          "settings": {
+            "shape": "pill"
+          },
+          "guidance": "Use filter chips for 2 to 8 common filters above a list. Show how many results match. Always offer 'Clear all'."
+        }
+      }
+    },
+    "chart": {
+      "$description": "Simple bar and line charts, like costs by month.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Chart",
+          "category": "data",
+          "level": "Composite",
+          "settings": {
+            "labels": "last"
+          },
+          "guidance": "Say the main point in the chart title, like 'Your costs went down in August.' Use one color for one series. Always offer a table view. Never use two y-axes."
+        }
+      }
+    },
+    "stack": {
+      "$description": "Puts things in a column or row with even space between them.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Stack",
+          "category": "layout",
+          "level": "Primitive",
+          "settings": {},
+          "guidance": "Use Stack for all spacing between things. Never add margins by hand. Pick the gap from the spacing tokens."
+        }
+      }
+    },
+    "grid": {
+      "$description": "Lines up content in columns that change with the screen size.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Grid",
+          "category": "layout",
+          "level": "Primitive",
+          "settings": {
+            "cols": 12
+          },
+          "guidance": "Use the grid for page layouts. Use 4 columns on phones and 12 on computers. Cards should span whole columns."
+        }
+      }
+    },
+    "container": {
+      "$description": "Keeps a page from getting too wide, so lines of text are easy to read.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Container",
+          "category": "layout",
+          "level": "Primitive",
+          "settings": {
+            "reading": 720
+          },
+          "guidance": "Put text-heavy pages in the reading container. Put dashboards and tables in the page container."
+        }
+      }
+    },
+    "member-card": {
+      "$description": "A digital copy of the member's insurance card.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Member ID card",
+          "category": "health",
+          "level": "Healthcare",
+          "settings": {
+            "style": "band"
+          },
+          "guidance": "Show the member card as text people can read and zoom, with Print and Download. Put the member ID in large type. Show the phone numbers from the back of the card."
+        }
+      }
+    },
+    "provider-card": {
+      "$description": "A doctor or clinic in search results, with the key facts to choose one.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Provider card",
+          "category": "health",
+          "level": "Healthcare",
+          "settings": {
+            "photo": "show"
+          },
+          "guidance": "Show whether the doctor is in network and accepting new patients first. Show the distance and phone number. Give one main action."
+        }
+      }
+    },
+    "medication": {
+      "$description": "One medicine, with how to take it, refills, and a Refill button.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Medication item",
+          "category": "health",
+          "level": "Healthcare",
+          "settings": {
+            "instructions": "show"
+          },
+          "guidance": "Write instructions in plain words, like 'Take 1 tablet by mouth 2 times a day.' Never use short codes. Show refills left and when the medicine runs out."
+        }
+      }
+    },
+    "lab-result": {
+      "$description": "A test result with the normal range, so people can see if it is high or low.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Lab result",
+          "category": "health",
+          "level": "Healthcare",
+          "settings": {
+            "range": "bar"
+          },
+          "guidance": "Say in words if a result is normal, high, or low. Show the normal range. Link to a plain explanation. Suggest talking to the doctor for anything flagged."
+        }
+      }
+    },
+    "appointment-slots": {
+      "$description": "Open visit times shown as big buttons, grouped by day and time of day.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Appointment slot picker",
+          "category": "health",
+          "level": "Healthcare",
+          "settings": {
+            "shape": "md"
+          },
+          "guidance": "Show open times as big buttons, grouped by Morning and Afternoon. Show the next few days first. Always show the time zone and the visit length."
+        }
+      }
+    },
+    "plan-compare": {
+      "$description": "Two or three plans side by side, so people can compare costs and benefits.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Plan comparison",
+          "category": "health",
+          "level": "Healthcare",
+          "settings": {
+            "highlight": "badge"
+          },
+          "guidance": "Compare no more than 3 plans at once. Put the monthly cost and yearly limit first. Use the same row order for every plan. Mark the person's current plan."
+        }
+      }
+    },
+    "cost-estimate": {
+      "$description": "Shows what a service costs, what the plan pays, and what the member pays.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Cost estimate",
+          "category": "health",
+          "level": "Healthcare",
+          "settings": {},
+          "guidance": "Put what the member pays in the biggest type. Show what the plan pays too. Say it is an estimate and what it is based on."
+        }
+      }
+    },
+    "consent": {
+      "$description": "A way to read terms, agree, and sign with a typed name.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Consent and signature",
+          "category": "health",
+          "level": "Healthcare",
+          "settings": {
+            "sign": "typed"
+          },
+          "guidance": "Summarize the terms in plain words at the top. Let people download the full text. Say that typing their name is their signature. Show the date."
+        }
+      }
+    }
+  }
+}

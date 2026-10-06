@@ -1,0 +1,345 @@
+{
+  "$description": "Crestline brand colors. Only this file changes between brands.",
+  "$extensions": {
+    "org.brand-console": {
+      "name": "Crestline",
+      "division": "Partner division",
+      "wordsOnMainColor": "white"
+    }
+  },
+  "color": {
+    "$type": "color",
+    "brand": {
+      "primary": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.102,
+            0.2392,
+            0.6392
+          ],
+          "hex": "#1a3da3"
+        },
+        "$description": "Main color. Used for buttons, links, and the keyboard focus outline."
+      },
+      "secondary": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.2902,
+            0.6314,
+            0.8
+          ],
+          "hex": "#4aa1cc"
+        },
+        "$description": "Second color. Used for tags, badges, and selected rows."
+      },
+      "accent": {
+        "$value": {
+          "colorSpace": "srgb",
+          "components": [
+            0.5412,
+            0.7373,
+            0.2471
+          ],
+          "hex": "#8abc3f"
+        },
+        "$description": "Accent color. Used for small touches like logos and charts. Never for words."
+      }
+    },
+    "surface": {
+      "$description": "Page and window backgrounds for light and dark mode. Picked from the brand's color set.",
+      "light": {
+        "page": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              1,
+              1,
+              1
+            ],
+            "hex": "#ffffff"
+          },
+          "$description": "The page background.",
+          "$extensions": {
+            "org.brand-console": {
+              "automatic": true
+            }
+          }
+        },
+        "card": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              1,
+              1,
+              1
+            ],
+            "hex": "#ffffff"
+          },
+          "$description": "Windows, cards, and pop-ups.",
+          "$extensions": {
+            "org.brand-console": {
+              "automatic": true
+            }
+          }
+        },
+        "window-opacity": {
+          "$type": "number",
+          "$value": 1,
+          "$description": "How solid windows and cards are. 1 is fully solid."
+        },
+        "window-blur": {
+          "$type": "dimension",
+          "$value": {
+            "value": 0,
+            "unit": "px"
+          },
+          "$description": "How much windows blur what is behind them."
+        }
+      },
+      "dark": {
+        "page": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0.0118,
+              0.0588,
+              0.2471
+            ],
+            "hex": "#030f3f"
+          },
+          "$description": "The page background.",
+          "$extensions": {
+            "org.brand-console": {
+              "automatic": true
+            }
+          }
+        },
+        "card": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0.0118,
+              0.1882,
+              0.2627
+            ],
+            "hex": "#033043"
+          },
+          "$description": "Windows, cards, and pop-ups.",
+          "$extensions": {
+            "org.brand-console": {
+              "automatic": true
+            }
+          }
+        },
+        "window-opacity": {
+          "$type": "number",
+          "$value": 1,
+          "$description": "How solid windows and cards are. 1 is fully solid."
+        },
+        "window-blur": {
+          "$type": "dimension",
+          "$value": {
+            "value": 0,
+            "unit": "px"
+          },
+          "$description": "How much windows blur what is behind them."
+        }
+      }
+    },
+    "palette": {
+      "signature": {
+        "$description": "These three colors together are what people should know as Crestline.",
+        "$extensions": {
+          "org.brand-console": {
+            "name": "Signature color combination",
+            "order": 0
+          }
+        },
+        "royal-blue": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0.102,
+              0.2392,
+              0.6392
+            ],
+            "hex": "#1a3da3"
+          },
+          "$extensions": {
+            "org.brand-console": {
+              "name": "Royal blue",
+              "share": 30,
+              "order": 0
+            }
+          }
+        },
+        "sky-blue": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0.2902,
+              0.6314,
+              0.8
+            ],
+            "hex": "#4aa1cc"
+          },
+          "$extensions": {
+            "org.brand-console": {
+              "name": "Sky blue",
+              "share": 17,
+              "order": 1,
+              "shade": "#4193B8"
+            }
+          }
+        },
+        "leaf-green": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0.5412,
+              0.7373,
+              0.2471
+            ],
+            "hex": "#8abc3f"
+          },
+          "$extensions": {
+            "org.brand-console": {
+              "name": "Leaf green",
+              "share": 12,
+              "order": 2,
+              "shade": "#6A9835"
+            }
+          }
+        }
+      },
+      "base": {
+        "$description": "The main background. It gives the other colors room to stand out.",
+        "$extensions": {
+          "org.brand-console": {
+            "name": "Base",
+            "order": 1
+          }
+        },
+        "white": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              1,
+              1,
+              1
+            ],
+            "hex": "#ffffff"
+          },
+          "$extensions": {
+            "org.brand-console": {
+              "name": "White",
+              "share": 20,
+              "order": 0
+            }
+          }
+        }
+      },
+      "accent": {
+        "$description": "Use these in small amounts, like in charts, icons, and highlights.",
+        "$extensions": {
+          "org.brand-console": {
+            "name": "Accent colors",
+            "order": 2
+          }
+        },
+        "light-gray": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0.902,
+              0.9059,
+              0.9137
+            ],
+            "hex": "#e6e7e9"
+          },
+          "$extensions": {
+            "org.brand-console": {
+              "name": "Light gray",
+              "share": 6,
+              "order": 0
+            }
+          }
+        },
+        "dark-gray": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0.3333,
+              0.3412,
+              0.349
+            ],
+            "hex": "#555759"
+          },
+          "$extensions": {
+            "org.brand-console": {
+              "name": "Dark gray",
+              "share": 6,
+              "order": 1
+            }
+          }
+        },
+        "navy": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0.0588,
+              0.1843,
+              0.3333
+            ],
+            "hex": "#0f2f55"
+          },
+          "$extensions": {
+            "org.brand-console": {
+              "name": "Navy",
+              "share": 4,
+              "order": 2
+            }
+          }
+        },
+        "pale-blue": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0.9216,
+              0.9373,
+              0.9765
+            ],
+            "hex": "#ebeff9"
+          },
+          "$extensions": {
+            "org.brand-console": {
+              "name": "Pale blue",
+              "share": 2,
+              "order": 3
+            }
+          }
+        },
+        "berry": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0.6314,
+              0.1255,
+              0.3804
+            ],
+            "hex": "#a12061"
+          },
+          "$extensions": {
+            "org.brand-console": {
+              "name": "Berry",
+              "share": 2,
+              "order": 4
+            }
+          }
+        }
+      }
+    }
+  }
+}

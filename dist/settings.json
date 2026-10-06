@@ -1,0 +1,227 @@
+{
+  "brands": [
+    "northfield",
+    "crestline"
+  ],
+  "fonts": {
+    "heading": "Public Sans",
+    "body": "Public Sans",
+    "labels": "Public Sans",
+    "headingStyle": "normal",
+    "href": "https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,700&display=swap",
+    "needLicense": [],
+    "files": []
+  },
+  "components": {
+    "button": {
+      "bg": "action.primary",
+      "radius": "md",
+      "weight": 600,
+      "case": "sentence",
+      "track": "normal",
+      "pad": "normal"
+    },
+    "field": {
+      "border": "border.strong",
+      "radius": "md",
+      "labelWeight": 600
+    },
+    "select": {
+      "radius": "md",
+      "menuShadow": "soft"
+    },
+    "card": {
+      "radius": "lg",
+      "shadow": "soft",
+      "border": "on"
+    },
+    "dialog": {
+      "radius": "lg",
+      "overlay": 50,
+      "order": "end"
+    },
+    "icon-button": {
+      "shape": "md",
+      "showLabel": "yes"
+    },
+    "button-group": {
+      "selected": "soft"
+    },
+    "link": {
+      "underline": "always",
+      "weight": 600
+    },
+    "textarea": {
+      "rows": 5,
+      "count": "show"
+    },
+    "checkbox": {
+      "size": 1.6,
+      "radius": "sm"
+    },
+    "radio": {
+      "style": "tiles"
+    },
+    "switch": {
+      "stateText": "yes"
+    },
+    "combobox": {
+      "match": "bold",
+      "min": 2
+    },
+    "search": {
+      "button": "text"
+    },
+    "date-input": {
+      "labels": "words"
+    },
+    "date-picker": {
+      "weekStart": "sun",
+      "day": "pill"
+    },
+    "time-picker": {
+      "step": 30
+    },
+    "masked": {
+      "format": "hint"
+    },
+    "number": {
+      "stepper": "show"
+    },
+    "file-upload": {
+      "style": "drop"
+    },
+    "label-hint": {
+      "mark": "optional"
+    },
+    "error-message": {
+      "icon": "show"
+    },
+    "fieldset": {
+      "legend": "h3"
+    },
+    "error-summary": {
+      "border": 4
+    },
+    "alert": {
+      "style": "soft"
+    },
+    "banner": {
+      "tone": "info"
+    },
+    "toast": {
+      "duration": 10
+    },
+    "progress": {
+      "height": 12
+    },
+    "spinner": {
+      "words": "yes"
+    },
+    "skeleton": {
+      "pulse": "on"
+    },
+    "empty-state": {
+      "icon": "show"
+    },
+    "timeout": {
+      "warn": 5
+    },
+    "badge": {
+      "shape": "pill"
+    },
+    "avatar": {
+      "shape": "pill"
+    },
+    "accordion": {
+      "icon": "chevron"
+    },
+    "summary-list": {
+      "lines": "on"
+    },
+    "callout": {
+      "weight": 4
+    },
+    "divider": {
+      "weight": 1
+    },
+    "tooltip": {
+      "tone": "dark"
+    },
+    "popover": {},
+    "icon": {
+      "stroke": 2
+    },
+    "header": {
+      "style": "white",
+      "phone": "yes"
+    },
+    "footer": {
+      "style": "light"
+    },
+    "side-nav": {
+      "current": "fill"
+    },
+    "tabs": {
+      "style": "line"
+    },
+    "breadcrumbs": {
+      "sep": "chevron"
+    },
+    "pagination": {
+      "style": "numbers"
+    },
+    "stepper": {
+      "dir": "col"
+    },
+    "skip-link": {},
+    "menu": {},
+    "drawer": {
+      "side": "right",
+      "width": "narrow"
+    },
+    "help-drawer": {},
+    "data-table": {
+      "stripes": "off",
+      "header": "tinted"
+    },
+    "list": {
+      "lines": "on"
+    },
+    "filter-chips": {
+      "shape": "pill"
+    },
+    "chart": {
+      "labels": "last"
+    },
+    "stack": {},
+    "grid": {
+      "cols": 12
+    },
+    "container": {
+      "reading": 720
+    },
+    "member-card": {
+      "style": "band"
+    },
+    "provider-card": {
+      "photo": "show"
+    },
+    "medication": {
+      "instructions": "show"
+    },
+    "lab-result": {
+      "range": "bar"
+    },
+    "appointment-slots": {
+      "shape": "md"
+    },
+    "plan-compare": {
+      "highlight": "badge"
+    },
+    "cost-estimate": {},
+    "consent": {
+      "sign": "typed"
+    }
+  }
+}

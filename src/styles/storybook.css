@@ -1,0 +1,10 @@
+/* Storybook styles: Tailwind, then the draft theme from the Brand Console. */
+@import "tailwindcss";
+@import "../../build/draft/theme.css";
+@source "../components";
+@source "../stories";
+@theme inline { --color-success: var(--success); --color-warning: var(--warning); }
+
+/* Tailwind takes away list numbers and bullets. Put them back on the Guide pages' own lists, not inside component previews. */
+.sbdocs-content > ol { list-style: decimal; }
+.sbdocs-content > ul { list-style: disc; }

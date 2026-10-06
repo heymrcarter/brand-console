@@ -1,0 +1,17 @@
+{
+  // A tiny TypeScript app that uses the package the way a team's app would.
+  // Run: npm run check:types   (it checks types only and writes no files)
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": false,
+    "resolveJsonModule": true,
+    "types": []
+  },
+  "include": ["*.tsx"]
+}

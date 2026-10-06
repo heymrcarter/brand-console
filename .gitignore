@@ -1,0 +1,19 @@
+# Installed packages and build folders that are made again on demand
+node_modules/
+storybook-static/
+coverage/
+*.tsbuildinfo
+# Secrets: the Claude key and the Figma token live here
+.env
+# Logs, Mac folder files, and leftovers
+*.log
+.DS_Store
+*.old
+_to_delete/
+# Kept on purpose (not ignored):
+#   dist/ and build/draft/   the live and draft outputs apps and Storybook read
+#   releases/                every published version
+#   fonts/                   font files the brand team uploaded; releases and dist need them
+#   figma.json               the link to the team's Figma library (no secrets)
+#   .figma-sync.json         what the console and Figma last agreed on, so every copy compares the same way
+node_modules

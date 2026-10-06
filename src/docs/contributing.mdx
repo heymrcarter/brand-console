@@ -1,0 +1,38 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Guide/Contributing" />
+
+# Contributing
+
+Anyone at the company can suggest a change. These steps keep the design system safe for every app that uses it. This design system is for our own teams only.
+
+## Changing colors, fonts, or settings
+
+1. Make the change in the Brand Console, not in the token files by hand. The console checks it as you go.
+2. If you must change `tokens/` in a pull request, run `npm run check:tokens`. It runs the same checks as Publish. It fails if words would be hard to read.
+3. The brand team publishes. They pick what kind of update it is:
+   - **A fix (patch)**, like 1.4.0 to 1.4.1: only values change, like a color or a size.
+   - **New things (minor)**, like 1.4.0 to 1.5.0: something is added. Nothing is taken away.
+   - **A big change (major)**, like 1.4.0 to 2.0.0: something is removed or renamed, or works differently. Apps may need changes.
+
+## Changing or adding a component
+
+Follow `docs/component-rules.md` in the project. The short version:
+
+- Build in plain React. Do not add new Radix imports. Some older components still use Radix until we move them. See `docs/radix-migration-plan.md`.
+- Style only with the theme's CSS variables. Never type a brand color.
+- Use real HTML elements, so the keyboard and screen readers work.
+- Form parts and buttons pass a ref to the element people use.
+- Write all words at a fifth-grade reading level.
+- Add a story that shows every kind and state.
+- Add tests in `test/components/`. Find things by role and name, the way people do. Each test runs axe.
+- Add the export to `src/index.js` and its types to `src/index.d.ts`.
+
+## Before you ask for a review
+
+Run these, and fix anything they find:
+
+- `npm test` checks the engine, the server, and the React components.
+- `npm run check:types` checks the TypeScript types.
+- `npm run check:tokens` runs the token checks that guard Publish.
+- `npm run audit:storybook` checks every story in both brands and both modes, for readable text and with axe.

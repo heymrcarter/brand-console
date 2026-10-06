@@ -1,0 +1,49 @@
+{
+  "name": "Design system",
+  "version": "2025.10",
+  "description": "Ties the token files together. Pick a brand. Screen type, text size, and mode are applied by theme.css.",
+  "sets": {
+    "foundations": {
+      "sources": [
+        {
+          "$ref": "foundations.tokens.json"
+        }
+      ]
+    },
+    "components": {
+      "sources": [
+        {
+          "$ref": "components.tokens.json"
+        }
+      ]
+    }
+  },
+  "modifiers": {
+    "brand": {
+      "contexts": {
+        "northfield": [
+          {
+            "$ref": "brands/northfield.tokens.json"
+          }
+        ],
+        "crestline": [
+          {
+            "$ref": "brands/crestline.tokens.json"
+          }
+        ]
+      },
+      "default": "northfield"
+    }
+  },
+  "resolutionOrder": [
+    {
+      "$ref": "#/sets/foundations"
+    },
+    {
+      "$ref": "#/sets/components"
+    },
+    {
+      "$ref": "#/modifiers/brand"
+    }
+  ]
+}
