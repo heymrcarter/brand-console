@@ -105,6 +105,8 @@ const BASE={
     dialog:"Only use a pop-up when the person must decide something before going on, like confirming a delete. The title asks the question. The main button repeats the action, like \"Delete this address,\" not \"OK.\""}
 };
 function clone(o){return JSON.parse(JSON.stringify(o));}
+/* Makes text safe to put inside HTML. */
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 /* Official brand color sets, taken from the brand color wheels. Order and share keep the brand's hierarchy. */
 const PALETTES={
   crestline:{groups:[
