@@ -142,3 +142,16 @@ test("hand-picked word and background colors are saved, used, and blocked when t
   assert.equal(L.secondary, "#EEF6E4");
   assert.ok(E.runChecks(st).some((c) => c.id === "pair-dark-northfield-tag" && c.level === "block"), "a too-dark tag word in dark mode blocks publishing");
 });
+
+test("field borders are checked for every brand, not only the first", () => {
+  const st = E.withDefaults(E.BASE);
+  st.comp.field.border = "action.primary"; // each brand's own main color
+  st.brands.northfield.primary = "#1F3A5F"; // dark: easy to see on white
+  st.brands.crestline.primary = "#E9EEF5"; // pale: too faint on white
+  const checks = E.runChecks(st).filter((c) => c.id.startsWith("fieldborder"));
+  const crest = checks.find((c) => c.id === "fieldborder-crestline"), north = checks.find((c) => c.id === "fieldborder-northfield");
+  assert.ok(crest && north, `one check per brand: ${checks.map((c) => c.id).join(", ")}`);
+  assert.equal(crest.level, "block");
+  assert.match(crest.title, /^Crestline: /);
+  assert.equal(north.level, "pass");
+});

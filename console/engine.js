@@ -285,8 +285,9 @@ export function runChecks(st){
       if(q<4.5&&r!=="button"&&(picked||(r==="soft"&&md==="light"))) add({id:`pair-${md}-${B.id}-${r}`,level:"block",title:`${B.name} ${md} mode: ${PAIR_NAMES[r].toLowerCase()} are too hard to read.`,detail:`These words reach ${fmt(q)} to 1 on their background. They need at least 4.5 to 1. Pick a darker or lighter color on the Color page.`,where:[B.name,md==="light"?"Light mode":"Dark mode"],ratio:q,pair:[f,g]});});}));
   BRANDS.forEach(B=>["light","dark"].forEach(md=>{const lk=lookOf(st.brands[B.id],md);
     if(lk.kind==="image"&&(!lk.img||!(lk.samples||[]).length)) add({id:`img-${md}-${B.id}`,level:"block",title:`${B.name} ${md} mode: the page picture is missing.`,detail:"Add the picture again from the Color page, so the console can measure its colors and check the words on it.",where:[B.name,md==="light"?"Light mode":"Dark mode","Backgrounds"]});}));
-  const fb=roleColor(st,"northfield",st.comp.field.border), r5=contrast(fb,"#FFFFFF");
-  add({id:"fieldborder",level:r5<3?"block":"pass",title:r5<3?"Field borders are too faint to see.":"Field borders are easy to see.",detail:`The line around a text field has a contrast of ${fmt(r5)} to 1. It needs at least 3 to 1 so people can find where to type.`,where:["All brands","Text field","Select"],ratio:r5,pair:[fb,"#FFFFFF"],fix:r5<3?{kind:"field"}:null});
+  // Each brand has its own field border: its grays can be tinted by its main color, or the border can be that color.
+  BRANDS.forEach(B=>{const fb=roleColor(st,B.id,st.comp.field.border), r5=contrast(fb,"#FFFFFF");
+    add({id:`fieldborder-${B.id}`,level:r5<3?"block":"pass",title:`${B.name}: ${r5<3?"field borders are too faint to see.":"field borders are easy to see."}`,detail:`The line around a text field has a contrast of ${fmt(r5)} to 1. It needs at least 3 to 1 so people can find where to type.`,where:[B.name,"Text field","Select"],ratio:r5,pair:[fb,"#FFFFFF"]});});
   const rd=contrast(st.system.danger,PAGE);
   add({id:"danger",level:rd<4.5?"block":"pass",title:`Error messages ${rd<4.5?"are too hard to read.":"are easy to read."}`,detail:`Red error text has a contrast of ${fmt(rd)} to 1.`,where:["All brands"],ratio:rd,pair:[st.system.danger,PAGE]});
   const z=sizesFor(st,"consumer","standard"), zl=sizesFor(st,"consumer","large"), ze=sizesFor(st,"employee","standard");
