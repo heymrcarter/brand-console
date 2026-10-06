@@ -11,8 +11,8 @@
 //   TEAM_DOMAIN and POLICY_AUD keep their names. Secrets: GH_APP_PRIVATE_KEY -> GITHUB_APP_PRIVATE_KEY, ANTHROPIC_API_KEY.
 //
 // Usage (in GitHub Actions):  node scripts/deploy-worker.mjs
-//        node scripts/deploy-worker.mjs --check     only check the settings
-//        node scripts/deploy-worker.mjs --dry-run   check, and build the deploy without uploading it
+//        node scripts/deploy-worker.mjs --check     only check the settings, Cloudflare token too (the workflow's first step)
+//        node scripts/deploy-worker.mjs --dry-run   check, and build the deploy without uploading it. Needs no token.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -87,7 +87,8 @@ async function main() {
     console.error("Deploys run from GitHub Actions, with the settings stored in the repository. Push to main, or run the \"Deploy Worker\" workflow from the Actions tab. See docs/cloudflare.md.");
     process.exit(1);
   }
-  const { vars, secrets, problems, notes } = await checkSettings(process.env, { needCloudflare: !checkOnly && !dryRun });
+  // --check runs first in the workflow, so a missing token fails there, not after the long build.
+  const { vars, secrets, problems, notes } = await checkSettings(process.env, { needCloudflare: !dryRun });
   for (const n of notes) console.log(`Note: ${n}`);
   if (problems.length) {
     console.error(`The deploy settings have ${problems.length} problem${problems.length > 1 ? "s" : ""}. Fix them under Settings > Secrets and variables > Actions:`);
