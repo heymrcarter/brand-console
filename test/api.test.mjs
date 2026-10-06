@@ -31,6 +31,7 @@ test("the API answers the console's routes and nothing else", async () => {
   assert.equal(s.shared, true);
   assert.equal(s.model, null, "no model is shown when there is no Claude key");
   assert.equal(s.figma.connected, false);
+  assert.equal(s.github, null, "with no GitHub, the console is not told about one");
   assert.deepEqual(await api.call("GET", "/api/health"), { ok: true });
 });
 

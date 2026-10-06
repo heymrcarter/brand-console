@@ -2,13 +2,14 @@
 // Each route gets the request's JSON body. The server around it reads the body, decides who may call,
 // and sends the answer. Errors with a status (like 409 for "no changes to publish") go back as they are.
 //
-// info(): { ai, model, storybook, shared }, the parts of the console's state that come from the server's setup.
+// info(): { ai, model, storybook, shared, github }, the parts of the console's state that come from the server's setup.
+//   github is { repo, branch } when publishes go to GitHub (the Worker), so the console can say where.
 // credit(who, user): the name a publish or rollback is recorded under. The Worker adds the signed-in person.
 export function createApi({ store, figma, ask, info, credit = (who) => who }) {
   async function state() {
     const [draft, published, index, figmaStatus] = await Promise.all([store.draft(), store.published(), store.index(), figma.status()]);
     const i = info();
-    return { draft, published, history: index.versions, ai: !!i.ai, model: i.ai ? i.model : null, storybook: i.storybook, figma: figmaStatus, shared: !!i.shared };
+    return { draft, published, history: index.versions, ai: !!i.ai, model: i.ai ? i.model : null, storybook: i.storybook, figma: figmaStatus, shared: !!i.shared, github: i.github || null };
   }
   const routes = {
     "GET /api/state": () => state(),

@@ -38,7 +38,7 @@ export class DesignSystem extends DurableObject {
     const api = createApi({
       store, figma,
       ask: createAsk({ key: env.ANTHROPIC_API_KEY, model, missingKeyHelp: "Set it with: npx wrangler secret put ANTHROPIC_API_KEY" }),
-      info: () => ({ ai: !!env.ANTHROPIC_API_KEY, model, storybook: env.STORYBOOK_URL || "/storybook", shared: true }),
+      info: () => ({ ai: !!env.ANTHROPIC_API_KEY, model, storybook: env.STORYBOOK_URL || "/storybook", shared: true, github: { repo: env.GITHUB_REPO, branch: env.GITHUB_BRANCH || "main" } }),
       // The "Viewing as" menu says which team, and Cloudflare Access says who.
       credit: (who, user) => (user && user.email ? `${who || "Brand team"} · ${user.email}` : who),
     });

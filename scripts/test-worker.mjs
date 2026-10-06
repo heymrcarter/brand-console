@@ -64,6 +64,7 @@ try {
   const local = createStore(createDiskStorage(root));
   check(r.status === 200 && JSON.stringify(r.json.draft) === JSON.stringify(await local.draft()), "GET /api/state: the draft read from GitHub matches the project's");
   check(r.json.history.length === 3 && r.json.storybook === "/storybook" && r.json.shared === true && r.json.ai === false, "the history, the Storybook address, and no Claude key are reported");
+  check(r.json.github && r.json.github.repo === REPO && r.json.github.branch === "main", "the console is told which repository and branch publishes go to, for its banner");
   const draft = r.json.draft;
 
   draft.shape.radius += 1;
