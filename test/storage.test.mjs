@@ -10,6 +10,8 @@ import { createDiskStorage, createEnvSecrets } from "../server/storage/disk.mjs"
 import { createMemoryStorage, createMemorySecrets } from "../server/storage/memory.mjs";
 import { createGitHubStorage } from "../server/storage/github.mjs";
 import { createGitHubMock } from "./github-mock.mjs";
+import { createDurableStorage, createDurableSecrets } from "../worker/durable-storage.mjs";
+import { fakeDurableSql } from "./helpers/durable-sql.mjs";
 import { createStore } from "../server/store.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -18,6 +20,7 @@ const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), "dsc-storage-"));
 const storages = {
   disk: () => { const dir = tmpDir(); return { storage: createDiskStorage(dir), done: () => fs.rmSync(dir, { recursive: true, force: true }) }; },
   memory: () => ({ storage: createMemoryStorage(), done: () => {} }),
+  durable: () => ({ storage: createDurableStorage(fakeDurableSql()), done: () => {} }),
   github: () => { const gh = createGitHubMock(); return { storage: createGitHubStorage({ repo: "acme/design-system", token: "test-token", pending: createMemoryStorage(), fetch: gh.fetch }), done: () => {} }; },
 };
 
@@ -167,7 +170,7 @@ test("the store runs one call at a time, so a publish sees a save that started f
 });
 
 test("the store, the Figma sync, and the storage interface use no Node-only features, so a Worker can run them", () => {
-  for (const f of ["server/store.mjs", "server/figma.mjs", "server/engine.mjs", "server/storage/storage.mjs", "server/storage/memory.mjs", "server/storage/github.mjs"]) {
+  for (const f of ["server/store.mjs", "server/figma.mjs", "server/engine.mjs", "server/storage/storage.mjs", "server/storage/memory.mjs", "server/storage/github.mjs", "worker/durable-storage.mjs"]) {
     const code = fs.readFileSync(path.join(root, f), "utf8").replace(/\/\/.*$/gm, "");
     const imports = [...code.matchAll(/^\s*import\s[^;]*?from\s+["']([^"']+)["']/gm)].map((m) => m[1]);
     assert.deepEqual(imports.filter((i) => !i.startsWith(".")), [], `${f} imports only project files`);
@@ -387,4 +390,58 @@ test("the store publishes to GitHub as one commit, within a Worker's request lim
   const fresh = createStore(createGitHubStorage({ repo: REPO, token: "test-token", pending: createMemoryStorage(), fetch: mock.fetch }));
   assert.deepEqual(await fresh.published(), await store.published());
   assert.deepEqual(await fresh.draft(), await store.draft());
+});
+
+test("durable storage: a font over 1 MB is split into chunks, and nothing is left behind when it changes or goes", async () => {
+  const sql = fakeDurableSql(), s = createDurableStorage(sql);
+  const big = Uint8Array.from({ length: 3.5 * 1024 * 1024 }, (_, i) => (i * 7 + (i >> 11)) % 256);
+  await s.write("fonts/big.woff2", big);
+  const count = (t) => sql.exec(`SELECT COUNT(*) AS n FROM ${t}`).toArray()[0].n;
+  assert.equal(count("chunks"), 4, "3.5 MB is four 1 MB chunks, each under the 2 MB row limit");
+  assert.deepEqual(await s.readBytes("fonts/big.woff2"), big);
+  await s.write("fonts/big.woff2", Uint8Array.from([1, 2, 3]));
+  assert.equal(count("chunks"), 0, "a smaller file replaces the chunks");
+  assert.deepEqual(await s.readBytes("fonts/big.woff2"), Uint8Array.from([1, 2, 3]));
+  await s.write("fonts/big.woff2", big);
+  await s.remove("fonts/big.woff2");
+  assert.equal(count("chunks") + count("files"), 0, "removing it removes its chunks");
+});
+
+test("durable storage: listing reads only paths, and a small file costs one row write", async () => {
+  const sql = fakeDurableSql(), s = createDurableStorage(sql);
+  await s.write("fonts/big.woff2", new Uint8Array(2 * 1024 * 1024));
+  const before = sql.rowsWritten;
+  await s.write("tokens/a.json", "{}");
+  assert.equal(sql.rowsWritten - before, 1);
+  sql.queries.length = 0;
+  assert.deepEqual(await s.list(""), ["fonts/big.woff2", "tokens/a.json"]);
+  assert.ok(sql.queries.every((q) => /^SELECT path FROM files/.test(q)), "list never loads file data");
+});
+
+test("durable secrets: set in the console, with the Worker's own secrets as the fallback", async () => {
+  const sql = fakeDurableSql();
+  const secrets = createDurableSecrets(sql, { FIGMA_TOKEN: "from-wrangler" });
+  assert.equal(await secrets.get("FIGMA_TOKEN"), "from-wrangler");
+  await secrets.set("FIGMA_TOKEN", "from-console");
+  assert.equal(await createDurableSecrets(sql, { FIGMA_TOKEN: "from-wrangler" }).get("FIGMA_TOKEN"), "from-console", "it lasts");
+  await secrets.set("FIGMA_TOKEN", "");
+  assert.equal(await secrets.get("FIGMA_TOKEN"), "from-wrangler");
+  await assert.rejects(secrets.get("x; DROP TABLE secrets"), /not a valid secret name/);
+});
+
+test("the store publishes to GitHub with a Durable Object holding the pending changes", async () => {
+  const disk = createDiskStorage(root), files = {};
+  for (const p of [...(await disk.list("tokens")), ...(await disk.list("releases"))]) files[p] = await disk.read(p);
+  const mock = createGitHubMock({ repo: REPO, files });
+  const sql = fakeDurableSql();
+  const storage = () => createGitHubStorage({ repo: REPO, token: "test-token", pending: createDurableStorage(sql), fetch: mock.fetch });
+  const store = createStore(storage(), { copyEngineResults: false });
+  const d = await store.draft(); d.shape.radius += 1;
+  await store.saveDraft(d);
+  // The Durable Object can restart between requests. A new store on the same database sees the saved draft.
+  const after = createStore(storage(), { copyEngineResults: false });
+  assert.equal((await after.draft()).shape.radius, d.shape.radius);
+  const v = await after.publish({ note: "From a Durable Object.", who: "Test" });
+  assert.equal(mock.log()[0], `Publish design system v${v}: From a Durable Object.`);
+  assert.deepEqual(await createDurableStorage(sql).list(""), [], "the Durable Object is empty after the publish");
 });
