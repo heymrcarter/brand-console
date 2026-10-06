@@ -155,11 +155,18 @@ export function createGitHubStorage({ repo, branch = "main", token, pending, aut
   return {
     async read(p) { const b = await readBytes(p); return b === null ? null : new TextDecoder().decode(b); },
     readBytes,
+    // The console saves every draft file on each save, but usually only one has changed. A file that is the same as
+    // what is pending, or as what is on GitHub, is not written again. In a Durable Object, each write costs a row.
     async write(p, v) {
       const k = ownKey(p);
       if (typeof v !== "string" && !(v instanceof Uint8Array)) throw new TypeError("Storage only saves text or a Uint8Array.");
+      if (await isDeleted(k)) { await pending.write(k, v); await pending.remove(DELETED + k); return; }
+      const bytes = typeof v === "string" ? new TextEncoder().encode(v) : v;
+      const mine = await pending.readBytes(k);
+      if (mine !== null) { if (!sameData(mine, bytes)) await pending.write(k, v); return; }
+      const onGitHub = (await files((await latest()).tree)).get(k);
+      if (onGitHub && onGitHub.sha === await gitBlobSha(bytes)) return;
       await pending.write(k, v);
-      await pending.remove(DELETED + k);
     },
     async list(prefix = "") {
       const pre = storagePrefix(prefix);

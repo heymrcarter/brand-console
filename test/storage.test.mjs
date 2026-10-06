@@ -233,6 +233,46 @@ test("github storage: a font is uploaded once however many copies a publish make
   assert.deepEqual(mock.files()["releases/v1.1.0/fonts/a.woff2"], font);
 });
 
+test("github storage: a file that has not changed is not written again, so a draft save costs few storage writes", async () => {
+  const font = Uint8Array.from([1, 2, 3, 0, 255]);
+  const mock = createGitHubMock({ repo: REPO, files: { "tokens/a.json": "same", "fonts/f.woff2": font } });
+  const memory = createMemoryStorage(), ops = [];
+  const pending = { ...memory, write: (p, v) => { ops.push("write " + p); return memory.write(p, v); }, remove: (p) => { ops.push("remove " + p); return memory.remove(p); } };
+  const storage = createGitHubStorage({ repo: REPO, token: "test-token", pending, fetch: mock.fetch });
+  await storage.write("tokens/a.json", "same");
+  await storage.write("fonts/f.woff2", Uint8Array.from(font));
+  assert.deepEqual(ops, [], "the same content as on GitHub is not written, text or binary");
+  await storage.write("tokens/a.json", "changed");
+  await storage.write("tokens/a.json", "changed");
+  assert.deepEqual(ops, ["write tokens/a.json"], "the same content as pending is not written again, and no delete mark is cleared when there is none");
+  mock.calls.length = 0;
+  await storage.write("tokens/new.json", "x");
+  assert.ok(!mock.calls.some((c) => c.includes("/git/blobs/")), "deciding needs no download: Git's hash of the content is compared with the branch's list");
+  ops.length = 0;
+  await storage.remove("tokens/a.json");
+  await storage.write("tokens/a.json", "same");
+  assert.deepEqual(ops, ["remove tokens/a.json", "write .github-storage/deleted/tokens/a.json", "write tokens/a.json", "remove .github-storage/deleted/tokens/a.json"], "a file deleted and written again is written, and its delete mark cleared");
+  assert.equal(await storage.read("tokens/a.json"), "same");
+});
+
+test("the store's draft save writes only the files that changed", async () => {
+  const disk = createDiskStorage(root), files = {};
+  for (const p of [...(await disk.list("tokens")), ...(await disk.list("releases")), ...(await disk.list("build/draft"))]) files[p] = await disk.read(p);
+  const mock = createGitHubMock({ repo: REPO, files });
+  const memory = createMemoryStorage(); let writes = [];
+  const pending = { ...memory, write: (p, v) => { writes.push(p); return memory.write(p, v); } };
+  const store = createStore(createGitHubStorage({ repo: REPO, token: "test-token", pending, fetch: mock.fetch }), { copyEngineResults: false });
+  const d = await store.draft();
+  await store.saveDraft(d);
+  assert.deepEqual(writes, [], "saving the draft as it is writes nothing");
+  d.shape.radius += 1;
+  await store.saveDraft(d);
+  assert.ok(writes.length > 0 && writes.length < 8, `a one-setting change writes ${writes.length} files: ${writes.join(", ")}`);
+  writes = [];
+  await store.saveDraft(d);
+  assert.deepEqual(writes, [], "saving it again writes nothing");
+});
+
 test("github storage: pending changes last between requests, so a restarted Worker still commits them", async () => {
   const shared = createMemoryStorage();
   const first = github({ "tokens/a.json": "old" }, { pending: shared });
