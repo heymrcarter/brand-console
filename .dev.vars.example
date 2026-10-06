@@ -1,0 +1,19 @@
+# Settings for `npm run worker:dev` on your computer. Copy this file to .dev.vars (Git ignores it) and fill it in.
+# On Cloudflare, set secrets with `npx wrangler secret put NAME` instead. See docs/cloudflare.md.
+
+# The repository and branch the console reads and publishes to.
+GITHUB_REPO=acme/design-system
+GITHUB_BRANCH=main
+
+# Either a GitHub App (recommended) ...
+GITHUB_APP_ID=
+GITHUB_APP_INSTALLATION_ID=
+GITHUB_APP_PRIVATE_KEY=
+# ... or a fine-grained personal token with Contents: Read and write on that repository only.
+GITHUB_TOKEN=
+
+# Lets requests to localhost in without Cloudflare Access. Has no effect anywhere else.
+ACCESS_LOCAL_DEV=allow
+
+# Optional: connects the console's guide to Claude.
+ANTHROPIC_API_KEY=

@@ -151,6 +151,10 @@ After that, every time you publish, the console makes a Git commit for you.
 
 ---
 
+## Put it online for your team
+
+The console can run on Cloudflare Workers, with the design system in a GitHub repository and the company's sign-in in front. Every publish becomes a commit. The steps are in `docs/cloudflare.md`.
+
 ## Where things live
 
 | Folder or file | What it holds |
@@ -165,10 +169,11 @@ After that, every time you publish, the console makes a Git commit for you.
 | `.figma-sync.json` | What the console and Figma agreed on at the last sync, so the next sync can tell who changed what. |
 | `console/` | The Brand Console itself. `engine.js` holds the color math and checks. `registry.js` lists all 67 components. `figma.js` turns the design system into Figma variables and back. `basics.js` holds the small pieces those files share. `app.js` is the screen. |
 | `server/` | The small local server that saves, publishes, rolls back, and talks to Figma. It reads and writes files only through `server/storage/`: on this computer that is the project folder and `.env`, and in tests it is memory. |
+| `worker/` | The console on Cloudflare Workers: the Worker, the Durable Object that holds unpublished changes, and the Cloudflare Access sign-in check. `wrangler.jsonc` is its settings. See `docs/cloudflare.md`. |
 | `src/components/ui/` | All 68 React components. |
 | `src/stories/` | The Storybook pages for those components. |
 | `src/docs/` | The Guide pages in Storybook: Start here, Foundations, and Contributing. |
-| `docs/` | Notes for contributors: the component rules, the hosting and sign-in plan, and the plan to move off Radix. |
+| `docs/` | Notes for contributors: the component rules, the hosting and sign-in plan, putting the console on Cloudflare, and the plan to move off Radix. |
 | `test/` | The automatic tests. |
 
 ## What is in Phase 1, and what is not

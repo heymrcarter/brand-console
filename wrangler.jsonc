@@ -1,0 +1,38 @@
+// The Brand Console on Cloudflare Workers. Setup steps are in docs/cloudflare.md.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "brand-console",
+  "main": "worker/index.mjs",
+  "compatibility_date": "2026-10-01",
+
+  // The console's files and Storybook, made by: npm run worker:assets
+  "assets": {
+    "directory": "./.worker-assets",
+    "binding": "ASSETS",
+    // Every request goes to the Worker first, so nothing is served without a Cloudflare Access sign-in.
+    "run_worker_first": true,
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+
+  // One Durable Object per design system repository and branch. It orders the writes and holds unpublished changes.
+  "durable_objects": {
+    "bindings": [{ "name": "DESIGN_SYSTEM", "class_name": "DesignSystem" }]
+  },
+  "exports": {
+    "DesignSystem": { "type": "durable-object", "storage": "sqlite" }
+  },
+
+  // Settings that are not secret. Secrets (GITHUB_APP_PRIVATE_KEY, GITHUB_TOKEN, ANTHROPIC_API_KEY, FIGMA_TOKEN)
+  // are set with `npx wrangler secret put NAME`, and for wrangler dev in .dev.vars, which Git ignores.
+  "vars": {
+    "GITHUB_REPO": "",
+    "GITHUB_BRANCH": "main",
+    "GITHUB_APP_ID": "",
+    "GITHUB_APP_INSTALLATION_ID": "",
+    "TEAM_DOMAIN": "",
+    "POLICY_AUD": ""
+  },
+
+  "observability": { "enabled": true }
+}

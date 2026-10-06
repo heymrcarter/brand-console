@@ -30,6 +30,9 @@
   "scripts": {
     "start": "node scripts/start.mjs",
     "console": "node server/index.mjs",
+    "worker:assets": "node scripts/build-worker-assets.mjs",
+    "worker:dev": "node scripts/build-worker-assets.mjs --no-storybook && wrangler dev",
+    "worker:deploy": "node scripts/build-worker-assets.mjs && wrangler deploy",
     "storybook": "storybook dev -p 6006",
     "build": "node scripts/build.mjs",
     "export:tokens": "node scripts/export-tokens.mjs",
@@ -38,6 +41,7 @@
     "test": "node --test \"test/*.test.mjs\" && vitest run",
     "test:node": "node --test \"test/*.test.mjs\"",
     "test:components": "vitest run",
+    "test:worker": "node scripts/test-worker.mjs",
     "check:types": "node scripts/build.mjs && tsc -p test/types",
     "check:tokens": "node scripts/check-tokens.mjs",
     "reset-sample-data": "node scripts/seed.mjs",
@@ -77,6 +81,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.1",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "wrangler": "^4.147.0"
   }
 }

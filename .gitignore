@@ -17,3 +17,8 @@ _to_delete/
 #   figma.json               the link to the team's Figma library (no secrets)
 #   .figma-sync.json         what the console and Figma last agreed on, so every copy compares the same way
 node_modules
+
+# Cloudflare: local Worker state, local secrets, and the static files made for the Worker
+.wrangler/
+.dev.vars
+.worker-assets/
