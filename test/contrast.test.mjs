@@ -155,3 +155,13 @@ test("field borders are checked for every brand, not only the first", () => {
   assert.match(crest.title, /^Crestline: /);
   assert.equal(north.level, "pass");
 });
+
+test("a field border that is too faint offers a fix, and the fix makes it easy to see", () => {
+  const st = E.withDefaults(E.BASE);
+  st.comp.field.border = "border.default"; // light gray: too faint for every brand
+  const blocked = E.runChecks(st).filter((c) => c.id.startsWith("fieldborder") && c.level === "block");
+  assert.equal(blocked.length, E.BRANDS.length);
+  for (const c of blocked) assert.deepEqual(c.fix, { kind: "field" }, `${c.id} offers the Fix it button`);
+  for (const ch of E.fixChanges(st, blocked[0].fix)) E.setP(st, ch.path, ch.value);
+  assert.deepEqual(E.runChecks(st).filter((c) => c.id.startsWith("fieldborder") && c.level === "block"), []);
+});
