@@ -2,7 +2,7 @@
    STATE
    ===================================================================== */
 const S={
-  role:"brand",
+  role:"admin", me:null,
   sec:"color",
   published:null,
   draft:null,
@@ -104,7 +104,7 @@ function nav(){
 }
 function topbar(){
   return `<div class="top"><div style="display:flex;align-items:center;gap:12px;min-width:0"><div class="gbadge" style="width:26px;height:26px;border-radius:7px;background:conic-gradient(${BRANDS.map((b,i)=>`${S.draft.brands[b.id].primary} ${i*100/BRANDS.length}% ${(i+1)*100/BRANDS.length}%`).join(",")})"></div><div class="t">Brand Console</div><div class="v hide-s">Design system for 2 brands</div></div>
-    <div style="display:flex;align-items:center;gap:10px"><span class="pill ok">Live: v${S.published.version}</span>${changes().length?`<span class="pill warn hide-s">Draft open</span>`:""}</div></div>`;
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">${S.me?`<span class="who hide-s" title="Signed in as ${esc(S.me.email)}">${esc(S.me.name||S.me.email)}</span>`:""}${S.offline?"":`<a class="sblink hide-s" href="${esc(S.storybook)}" target="_blank" rel="noopener">Open Storybook</a>`}<span class="pill ok">Live: v${S.published.version}</span>${changes().length?`<span class="pill warn hide-s">Draft open</span>`:""}</div></div>`;
 }
 
 /* =====================================================================
@@ -950,8 +950,9 @@ function voiceStop(){const v=S.voice;if(!v)return;S.voice=null;
 function brandBar(){
   return `<div class="brandbar" role="group" aria-label="Brand you are editing"><span class="bbl">Brand you are editing</span><div class="bbseg">${BRANDS.map(b=>{const on=b.id===S.ui.brand;return `<button type="button" class="${on?"on":""}" data-seg="ui.brand" data-v="${b.id}" aria-pressed="${on}"><i style="background:${S.draft.brands[b.id].primary}"></i>${esc(b.name)}</button>`;}).join("")}</div></div>`;
 }
+/* The offline prototype says that its changes stay in the page. Online, the top bar shows who is signed in instead. */
 function proto(){
-  return `<div class="proto">${S.offline?`<b>Prototype</b><span>Changes stay in this page until you reload. The local version saves them to real files.</span>`:S.github?`<b>Shared version</b><span>Your changes save as a draft your team shares. Publishing commits them to ${esc(S.github.repo)} (${esc(S.github.branch)}) on GitHub.</span>`:S.shared?`<b>Shared version</b><span>Your changes save to the tokens folder on the team's server.</span>`:`<b>Local version</b><span>Your changes save to the tokens folder on this computer.</span>`}<div class="sp"><label for="role">Viewing as</label><select id="role" data-role="1"><option value="brand"${S.role==="brand"?" selected":""}>Brand team</option><option value="admin"${S.role==="admin"?" selected":""}>Admin team</option><option value="designer"${S.role==="designer"?" selected":""}>Designer</option></select>${S.offline?"":`<a class="sblink" href="${esc(S.storybook)}" target="_blank" rel="noopener">Open Storybook</a>`}</div></div>`;
+  return S.offline?`<div class="proto"><b>Prototype</b><span>Changes stay in this page until you reload.</span></div>`:"";
 }
 function section(){
   switch(S.sec){
@@ -1266,7 +1267,6 @@ document.addEventListener("input",e=>{
 document.addEventListener("change",e=>{
   const t=e.target;
   if(t.id==="navsel"){A.go({dataset:{s:t.value}});return;}
-  if(t.dataset.role){S.role=t.value;render();return;}
   if(t.dataset.path){setDraft(t.dataset.path,t.type==="color"?normHex(t.value):t.value);return;}
   if(t.dataset.pct){render();return;}
   if(t.dataset.img&&t.files&&t.files[0]){const f=t.files[0],base=t.dataset.img,im=new Image(),url=URL.createObjectURL(f);
@@ -1337,8 +1337,9 @@ function showSignedOut(){
 }
 function fmtDate(d){const t=new Date(d+"T12:00:00");return isNaN(t)?d:t.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});}
 function mapHistory(v){return v.map(x=>({v:x.version,date:fmtDate(x.date),who:x.who,note:x.note,flag:!!x.flag,rb:!!x.rollbackOf}));}
-function roleWho(){return S.role==="admin"?"Admin team":S.role==="designer"?"Design team":"Brand team";}
-function loadState(r){S.draft=r.draft;S.published=r.published;S.history=mapHistory(r.history||[]);if("ai" in r){S.ai.server=!!r.ai;S.ai.model=r.model;}if(r.storybook)S.storybook=r.storybook;if(r.figma)S.figma=r.figma;if("shared" in r)S.shared=!!r.shared;if("github" in r)S.github=r.github;lastSaved=JSON.stringify(S.draft);S.save="saved";}
+/* Who a publish is credited to. Online, the server records the signed-in person and ignores this. */
+function roleWho(){return S.me?S.me.email:"Brand team";}
+function loadState(r){S.draft=r.draft;S.published=r.published;S.history=mapHistory(r.history||[]);if("ai" in r){S.ai.server=!!r.ai;S.ai.model=r.model;}if(r.storybook)S.storybook=r.storybook;if(r.figma)S.figma=r.figma;if("shared" in r)S.shared=!!r.shared;if("github" in r)S.github=r.github;if(r.me){S.me=r.me;S.role=r.me.role;}lastSaved=JSON.stringify(S.draft);S.save="saved";}
 function mergeTurns(t){const o=[];t.forEach(x=>{if(o.length&&o[o.length-1].role===x.role)o[o.length-1].content+="\n\n"+x.content;else o.push({...x});});while(o.length&&o[0].role!=="user")o.shift();return o;}
 function parseLoose(t){if(!t)return null;try{return JSON.parse(t);}catch(e){}const f=t.match(/```(?:json)?\s*([\s\S]*?)```/);if(f){try{return JSON.parse(f[1]);}catch(e){}}const a=t.indexOf("{"),b=t.lastIndexOf("}");if(a>=0&&b>a){try{return JSON.parse(t.slice(a,b+1));}catch(e){}}return null;}
 let saveT=null,lastSaved="",savePromise=null;

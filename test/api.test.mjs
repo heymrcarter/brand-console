@@ -53,3 +53,19 @@ test("credit decides the name a publish and a rollback are recorded under", asyn
   assert.equal(back.history[0].who, "Admin team · sam@example.com");
   assert.equal(back.history[0].rollbackOf, "1.4.0");
 });
+
+test("the server says who is signed in and their role, and the browser cannot choose a role", async () => {
+  const { api } = await setup();
+  assert.equal((await api.call("GET", "/api/state")).me, null, "with nobody signed in, there is no one to show");
+  const me = (await api.call("GET", "/api/state", {}, { email: "maya@example.com", name: "Maya R." })).me;
+  assert.deepEqual(me, { email: "maya@example.com", name: "Maya R.", role: "admin" }, "everyone is an admin for now");
+
+  // The Figma sync limits some settings by role. The role it gets is the server's, whatever the browser sends.
+  const seen = [];
+  const figma = { status: async () => ({}), compare: async (b) => (seen.push(b.role), { rows: [] }), compareFiles: async (b) => (seen.push(b.role), { rows: [] }) };
+  const store = { draft: async () => ({}), published: async () => ({}), index: async () => ({ versions: [] }) };
+  const viewerApi = createApi({ store, figma, ask: async () => "", info: () => ({}), roleOf: () => "viewer" });
+  await viewerApi.call("POST", "/api/figma/compare", { role: "admin" }, { email: "sam@example.com" });
+  await viewerApi.call("POST", "/api/figma/files/compare", { role: "admin", files: [] }, { email: "sam@example.com" });
+  assert.deepEqual(seen, ["viewer", "viewer"]);
+});

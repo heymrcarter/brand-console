@@ -39,8 +39,10 @@ export class DesignSystem extends DurableObject {
       store, figma,
       ask: createAsk({ key: env.ANTHROPIC_API_KEY, model, missingKeyHelp: "Set it with: npx wrangler secret put ANTHROPIC_API_KEY" }),
       info: () => ({ ai: !!env.ANTHROPIC_API_KEY, model, storybook: env.STORYBOOK_URL || "/storybook", shared: true, github: { repo: env.GITHUB_REPO, branch: env.GITHUB_BRANCH || "main" } }),
-      // The "Viewing as" menu says which team, and Cloudflare Access says who.
-      credit: (who, user) => (user && user.email ? `${who || "Brand team"} · ${user.email}` : who),
+      // Each version is credited to the person Cloudflare Access signed in.
+      credit: (who, user) => (user && user.email ? user.email : who),
+      // Everyone is an admin for now. Later: map Microsoft Entra ID groups to "viewer", "editor", and "admin" here.
+      roleOf: () => "admin",
     });
     this.#parts = { storage, api };
     return this.#parts;

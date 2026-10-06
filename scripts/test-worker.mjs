@@ -44,6 +44,7 @@ try {
   check(r.status === 200 && JSON.stringify(r.json.draft) === JSON.stringify(await local.draft()), "GET /api/state: the draft read from GitHub matches the project's");
   check(r.json.history.length === 3 && r.json.storybook === "/storybook" && r.json.shared === true && r.json.ai === false, "the history, the Storybook address, and no Claude key are reported");
   check(r.json.github && r.json.github.repo === REPO && r.json.github.branch === "main", "the console is told which repository and branch publishes go to, for its banner");
+  check(r.json.me && r.json.me.email === "local-dev" && r.json.me.role === "admin", `the console is told who is signed in, and their role: ${JSON.stringify(r.json.me)}`);
   const draft = r.json.draft;
 
   draft.shape.radius += 1;
@@ -73,7 +74,7 @@ try {
   const v = r.json && r.json.version;
   check(r.status === 200 && v === "1.4.1", `POST /api/publish -> ${v || r.json?.error}`);
   check(github.log()[0] === `Publish design system v${v}: From the Worker.` && github.log().length === 2, "the publish is one commit on GitHub");
-  check(r.json.history[0].who === "Brand team · local-dev", `the version is credited to the team and the signed-in person: "${r.json.history[0].who}"`);
+  check(r.json.history[0].who === "local-dev", `the version is credited to the signed-in person: "${r.json.history[0].who}"`);
   const after = github.files();
   check(Buffer.compare(Buffer.from(after[`releases/v${v}/fonts/worker-sans-400.woff2`] || []), font) === 0 && Buffer.compare(Buffer.from(after["fonts/worker-sans-400.woff2"] || []), font) === 0, "the font reached GitHub byte for byte, in fonts/ and the release");
   check(new TextDecoder().decode(after["dist/theme.css"]).includes(v), "dist/theme.css on GitHub has the new version");
