@@ -798,7 +798,7 @@ function figReview(){const F=S.fig;if(!F.rows)return "";
       <div class="under" aria-live="polite">${open?`Pick for ${open} more thing${open>1?"s":""} first.`:F.source==="files"?`This changes ${toHere} thing${toHere===1?"":"s"} in your edits. Then you download new files for Figma.`:`This sends ${toFig} value${toFig===1?"":"s"} to Figma and changes ${toHere} thing${toHere===1?"":"s"} in your draft.`}</div></div></div>`;}
 function secFigma(){
   S.fig=S.fig||{};const f=S.figma||{},F=S.fig,ed=canEdit();
-  const steps=`<ol class="figsteps"><li>In Figma, open the menu at the top left, then <b>Settings</b>, then the <b>Security</b> tab.</li><li>Under <b>Personal access tokens</b>, pick <b>Generate new token</b>.</li><li>Give it access to <b>File content: read</b> and <b>Variables: read and write</b>.</li><li>Copy the token and paste it here. ${S.shared?"The console keeps it on the team's server, and never sends it to anyone's browser.":"The console keeps it in the .env file on this computer only."} It never goes into your design system files.</li></ol>`;
+  const steps=`<ol class="figsteps"><li>In Figma, open the menu at the top left, then <b>Settings</b>, then the <b>Security</b> tab.</li><li>Under <b>Personal access tokens</b>, pick <b>Generate new token</b>.</li><li>Give it access to <b>File content: read</b> and <b>Variables: read and write</b>.</li><li>Copy the token and paste it here. The console keeps it on the team's server, and never sends it to anyone's browser. It never goes into your design system files.</li></ol>`;
   const err=F.error?`<div class="figerr" role="alert">${esc(F.error)}</div>`:"";
   let top;
   if(S.offline) top=`<div class="box"><div class="bt">Your Figma library</div><div class="bs">The live connection to Figma works in the local version on your computer. In this prototype, you can save the link and sync with files.</div>
@@ -1190,7 +1190,7 @@ const A={
     if(S.offline){S.figma={...(S.figma||{}),fileUrl:link};figSet({error:null});toast("I saved the link. Open in Figma is at the top of the left column.");return;}
     try{S.figma=await api("POST","/api/figma/link",{fileUrl:link});figSet({error:null});toast("I saved the link. Open in Figma is at the top of the left column.");}catch(e){figSet({error:e.message});}},
   figEdit(){S.figma={...(S.figma||{}),connected:false};figSet({rows:null,error:null,done:null});},
-  async figDisconnect(){try{S.figma=await api("POST","/api/figma/disconnect",{forgetToken:true});figSet({rows:null,error:null,done:null});toast(`I disconnected Figma and removed the token from ${S.shared?"the team's server":"this computer"}.`);}catch(e){figSet({error:e.message});}},
+  async figDisconnect(){try{S.figma=await api("POST","/api/figma/disconnect",{forgetToken:true});figSet({rows:null,error:null,done:null});toast(`I disconnected Figma and removed the token from the team's server.`);}catch(e){figSet({error:e.message});}},
   async figCompare(){figSet({busy:"compare",error:null,done:null,rows:null});
     try{const r=await api("POST","/api/figma/compare",{role:S.role});S.figma=r.status||S.figma;figSet({busy:null,rows:r.rows,extras:r.extras,picks:{},add:{},source:"api",other:r.otherVariables});}
     catch(e){if(/Enterprise/.test(e.message))S.figma={...(S.figma||{}),varsBlocked:true};figSet({busy:null,error:e.message});}},
@@ -1466,7 +1466,7 @@ function fmtDate(d){const t=new Date(d+"T12:00:00");return isNaN(t)?d:t.toLocale
 function mapHistory(v){return v.map(x=>({v:x.version,date:fmtDate(x.date),note:x.note||"",url:x.url||null}));}
 /* Who a change is credited to, in the offline prototype. Online, the server records the signed-in person. */
 function roleWho(){return S.me?S.me.email:"Brand team";}
-function loadState(r){S.draft=r.draft;S.published=r.published;S.engine=r.engine||null;S.base=r.base||null;S.proposal=r.proposal||null;S.notice=r.notice||null;if(!Object.hasOwn(S.draft.brands,S.ui.brand))S.ui.brand=brandList(S.draft)[0].id;S.history=mapHistory(r.history||[]);if("ai" in r){S.ai.server=!!r.ai;S.ai.model=r.model;}if(r.storybook)S.storybook=r.storybook;if(r.figma)S.figma=r.figma;if("shared" in r)S.shared=!!r.shared;if("github" in r)S.github=r.github;if(r.me){S.me=r.me;S.role=r.me.role;}lastSaved=JSON.stringify(S.draft);S.save="saved";}
+function loadState(r){S.draft=r.draft;S.published=r.published;S.engine=r.engine||null;S.base=r.base||null;S.proposal=r.proposal||null;S.notice=r.notice||null;if(!Object.hasOwn(S.draft.brands,S.ui.brand))S.ui.brand=brandList(S.draft)[0].id;S.history=mapHistory(r.history||[]);if("ai" in r){S.ai.server=!!r.ai;S.ai.model=r.model;}if(r.storybook)S.storybook=r.storybook;if(r.figma)S.figma=r.figma;if("github" in r)S.github=r.github;if(r.me){S.me=r.me;S.role=r.me.role;}lastSaved=JSON.stringify(S.draft);S.save="saved";}
 function mergeTurns(t){const o=[];t.forEach(x=>{if(o.length&&o[o.length-1].role===x.role)o[o.length-1].content+="\n\n"+x.content;else o.push({...x});});while(o.length&&o[0].role!=="user")o.shift();return o;}
 function parseLoose(t){if(!t)return null;try{return JSON.parse(t);}catch(e){}const f=t.match(/```(?:json)?\s*([\s\S]*?)```/);if(f){try{return JSON.parse(f[1]);}catch(e){}}const a=t.indexOf("{"),b=t.lastIndexOf("}");if(a>=0&&b>a){try{return JSON.parse(t.slice(a,b+1));}catch(e){}}return null;}
 let saveT=null,lastSaved="",savePromise=null;
