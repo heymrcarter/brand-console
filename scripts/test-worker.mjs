@@ -47,7 +47,7 @@ try {
   r = await call("GET", "/api/state");
   const local = createStore(createMemoryStorage(sampleFiles()));
   check(r.status === 200 && JSON.stringify(r.json.draft) === JSON.stringify(await local.draft()), "GET /api/state: the draft read from GitHub matches the sample's main");
-  check(r.json.published.version === "1.5.0" && r.json.history.length === 4 && r.json.history[0].version === "1.5.0", "live is main at 1.5.0, and the versions come from the releases");
+  check(r.json.published.version === "1.0.0" && r.json.history.length === 4 && r.json.history[0].version === "1.0.0", "live is main at 1.0.0, and the versions come from the releases");
   check(r.json.proposal === null && r.json.storybook === "/storybook" && r.json.ai === false, "no proposal yet, the Storybook address, and no Claude key are reported");
   check(r.json.github && r.json.github.repo === REPO && r.json.github.branch === "main", "the console is told which repository proposals go to");
   check(r.json.me && r.json.me.email === "local-dev" && r.json.me.role === "admin", `the console is told who is signed in, and their role: ${JSON.stringify(r.json.me)}`);
@@ -96,16 +96,16 @@ try {
   r = await call("POST", "/api/proposal/submit");
   check(r.status === 200 && r.json.proposal.state === "in review" && github.pull(1).draft === false, "submit marks the pull request ready for review");
 
-  // A reviewer lands it. The Release workflow makes 1.6.0, the biggest bump.
+  // A reviewer lands it. The Release workflow makes 1.1.0, the biggest bump.
   const landed = await (await fetch(`${ghUrl}/_local/pulls/1/merge`, { method: "POST" })).json();
-  check(landed.version === "1.6.0", `the local stand-in lands it as ${landed.version}`);
+  check(landed.version === "1.1.0", `the local stand-in lands it as ${landed.version}`);
   r = await call("GET", "/api/state");
   check(r.json.proposal === null && r.json.notice && r.json.notice.kind === "landed" && r.json.notice.number === 1, "the console knows the proposal landed");
-  check(r.json.published.version === "1.6.0" && r.json.published.type.scale === 1.333, "live is the new version");
+  check(r.json.published.version === "1.1.0" && r.json.published.type.scale === 1.333, "live is the new version");
   check(local.E.diff(r.json.published, r.json.draft).length === 0, "and no edits are left over");
 
-  r = await call("POST", "/api/rollback", { version: "1.4.0" });
-  check(r.status === 200 && r.json.published.version === "1.6.0" && local.E.diff(r.json.published, r.json.draft).length > 0, "a rollback becomes edits, and releases nothing on its own");
+  r = await call("POST", "/api/rollback", { version: "0.4.0" });
+  check(r.status === 200 && r.json.published.version === "1.1.0" && local.E.diff(r.json.published, r.json.draft).length > 0, "a rollback becomes edits, and releases nothing on its own");
   r = await call("POST", "/api/ask", { turns: [{ role: "user", content: "hi" }] });
   check(r.status === 503 && /wrangler secret put ANTHROPIC_API_KEY/.test(r.json.error), "with no Claude key, the guide says how to add one");
   for (const bad of ["/dist/theme.css", "/fonts/%2e%2e/%2e%2e/wrangler.jsonc", "/fonts/../package.json"]) {

@@ -150,11 +150,12 @@ test("the store runs one call at a time, so a read sees a save that started firs
 });
 
 test("the store, the Figma sync, and the storage interface use no Node-only features, so a Worker can run them", () => {
-  for (const f of ["server/store.mjs", "server/figma.mjs", "server/engine.mjs", "server/storage/storage.mjs", "server/storage/memory.mjs", "server/storage/github.mjs", "server/storage/github-app.mjs", "worker/durable-storage.mjs"]) {
+  for (const f of ["server/store.mjs", "server/proposals.mjs", "server/github-client.mjs", "server/figma.mjs", "server/engine.mjs", "server/storage/storage.mjs", "server/storage/memory.mjs", "server/storage/github.mjs", "server/storage/github-app.mjs", "worker/durable-storage.mjs"]) {
     const code = fs.readFileSync(path.join(root, f), "utf8").replace(/\/\/.*$/gm, "");
     const imports = [...code.matchAll(/^\s*import\s[^;]*?from\s+["']([^"']+)["']/gm)].map((m) => m[1]);
-    // The engine package loads without a web page or Node, and the design system repository tests that.
-    assert.deepEqual(imports.filter((i) => !i.startsWith(".") && i !== "@heymrcarter/design-system/engine"), [], `${f} imports only project files and the engine`);
+    // The engine package loads without a web page or Node, and the design system repository tests that. Its
+    // package.json gives the engine's version.
+    assert.deepEqual(imports.filter((i) => !i.startsWith(".") && !["@heymrcarter/design-system/engine", "@heymrcarter/design-system/package.json"].includes(i)), [], `${f} imports only project files and the engine`);
     assert.ok(!/\b(process|Buffer|require|__dirname)\b/.test(code), `${f} does not use process, Buffer, require, or __dirname`);
   }
 });

@@ -30,10 +30,12 @@ test("the API answers the console's routes and nothing else", async () => {
   assert.ok(!api.has("POST", "/api/publish") && !api.has("POST", "/api/flag"), "publishing straight to apps is gone: changes land through a proposal");
   assert.ok(!api.has("GET", "/api/nope") && !api.has("GET", "/api/toString") && !api.has("GET", "constructor"));
   const s = await api.call("GET", "/api/state");
-  assert.deepEqual(s.history.map((h) => h.version), ["1.5.0", "1.4.0", "1.3.0", "1.2.0"]);
-  assert.equal(s.published.version, "1.5.0");
+  assert.deepEqual(s.history.map((h) => h.version), ["1.0.0", "0.4.0", "0.3.0", "0.2.0"]);
+  assert.equal(s.published.version, "1.0.0");
   assert.equal(s.proposal, null);
   assert.equal(s.base, null);
+  assert.equal(s.engine.behind, false, "the console's engine is not behind the sample's live version");
+  assert.match(s.engine.version, /^\d+\.\d+\.\d+$/);
   assert.equal(s.storybook, "/storybook");
   assert.equal(s.model, null, "no model is shown when there is no Claude key");
   assert.equal(s.figma.connected, false);
@@ -57,10 +59,10 @@ test("a change is credited to the person signed in, and a rollback becomes edits
   assert.equal(r.proposal.changes[0].who, "maya@example.com", "the browser cannot say who made it");
   assert.equal(r.proposal.state, "draft");
   assert.equal((await api.call("POST", "/api/proposal/submit", {}, { email: "maya@example.com" })).proposal.state, "in review");
-  const back = await api.call("POST", "/api/rollback", { version: "1.3.0" }, { email: "sam@example.com" });
-  const v13 = back.history.find((h) => h.version === "1.3.0");
+  const back = await api.call("POST", "/api/rollback", { version: "0.3.0" }, { email: "sam@example.com" });
+  const v13 = back.history.find((h) => h.version === "0.3.0");
   assert.ok(v13);
-  assert.equal(back.published.version, "1.5.0", "nothing is released by a rollback");
+  assert.equal(back.published.version, "1.0.0", "nothing is released by a rollback");
   assert.equal(mock.pulls().length, 1);
 });
 

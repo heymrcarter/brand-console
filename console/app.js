@@ -682,14 +682,16 @@ function secProposal(){
   const rows=chs.map(c=>`<tr><td>${esc(labelFor(c.path))}</td><td class="num">${showVal(c.path,c.from)}</td><td class="num">${showVal(c.path,c.to)}</td><td>${canEdit()?`<button class="btn s" data-a="undo" data-p="${esc(c.path)}">Undo</button>`:""}</td></tr>`).join("");
   const edits=chs.length?`<div class="box"><div class="bt">${P?"Edits not in the proposal yet":"Your edits"}</div><div class="tw"><table class="t"><thead><tr><th>Setting</th><th>${P?"In the proposal":"Live"}</th><th>Now</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`
     :`<div class="box"><div class="bt">${P?"Edits not in the proposal yet":"Your edits"}</div><div class="bs">${P?"None. Everything you edited is in the proposal.":"None yet. Edit anything in the console, and it shows up here."}</div></div>`;
+  const paused=!!(S.engine&&S.engine.behind);
+  const pauseBox=paused?`<div class="ck"><span class="dotc" style="background:var(--amber)"></span><div class="body"><div class="tt">The console is updating to version ${esc(S.published.version)}.</div><div class="dd">The design system has new things the console does not know yet (it runs ${esc(S.engine.version)}). It updates itself after each release, in a few minutes. Your edits are saved. Reload the page to check.</div></div></div>`:"";
   const checksBox=k.block?`<div class="ck block"><span class="dotc" style="background:var(--red)"></span><div class="body"><div class="tt">${k.block} problem${k.block>1?"s":""} must be fixed first.</div><div class="dd">${esc(checks().filter(x=>x.level==="block").map(x=>x.title).join(" "))}</div><div class="btns">${btn("Open checks","go",{s:1,data:{s:"checks"}})}</div></div></div>`:"";
   const form=chs.length&&canEdit()?`<div class="box"><div class="bt">${P?"Add a change":"Start a proposal"}</div><div class="bs">${P?"These edits become one more change in the proposal.":"These edits become its first change. You can add more changes, and submit it for review when it is ready."}</div>
-      ${checksBox}
+      ${pauseBox}${checksBox}
       <div class="field"><label class="fl" for="chnote">What this change does</label><textarea class="inp" id="chnote" data-ui="changeNote" rows="2" maxlength="300">${esc(S.ui.changeNote||"")}</textarea><span class="hint">Reviewers and engineers read this. It goes into the release notes.</span></div>
       <div class="field"><span class="fl">This change is</span>${seg("ui.bump",bump,[["patch","A fix"],["minor","New things"],["major","A big change"]],{label:"Kind of change"})}
         <span class="hint">${bump===sug.bump?"I picked this from your edits. ":`I suggested ${KIND[sug.bump].toLowerCase()}. `}${esc(sug.why)}</span>
         <span class="hint">A fix changes values only. New things add something without taking anything away. A big change removes or renames something apps use, so apps may need work. The biggest change in a proposal decides its version.</span></div>
-      <div class="btns">${btn(P?"Add to the proposal":"Start the proposal","addChange",{p:1,dis:!!k.block})}</div></div>`:"";
+      <div class="btns">${btn(P?"Add to the proposal":"Start the proposal","addChange",{p:1,dis:!!k.block||paused})}</div></div>`:"";
   return `<div class="page narrow">${head("Release","Proposal",intro)}${noticeBox()}${proposalBox()}${edits}${form}</div>`;
 }
 function secHistory(){
@@ -1316,8 +1318,8 @@ const A={
   async doRb(e){const v=e.dataset.v;
     if(S.offline){const snap=S.snaps[v];if(!snap){toast("This prototype does not have that version.");return;}const pending=diff(S.published,S.draft),d=clone(snap);d.version=S.published.version;
       pending.forEach(c=>{if(c.path==="brandOrder")return;const x=getP(S.draft,c.path);if(x===undefined){const ks=c.path.split(".");const par=getP(d,ks.slice(0,-1).join("."));if(par)delete par[ks.at(-1)];}else setP(d,c.path,clone(x));});
-      markBefore("undo");S.draft=d;S.ui.confirmRb=null;S.sec="proposal";render();toast(`Your edits are version ${v} now. Add them to a proposal to make it live.`);return;}
-    try{await flushSave();markBefore("undo");const r=await api("POST","/api/rollback",{version:v});loadState(r);lastSaved=JSON.stringify(S.draft);S.ui.confirmRb=null;S.sec="proposal";render();toast(`Your edits are version ${v} now. Add them to a proposal to make it live.`);}catch(err){toast(err.message);}},
+      markBefore("undo");S.draft=d;S.ui.confirmRb=null;S.ui.undoNote=`Roll back to version ${v}`;S.ui.changeNote=undefined;S.sec="proposal";render();toast(`Your edits are version ${v} now. Add them to a proposal to make it live.`);return;}
+    try{await flushSave();markBefore("undo");const r=await api("POST","/api/rollback",{version:v});loadState(r);lastSaved=JSON.stringify(S.draft);S.ui.confirmRb=null;S.ui.undoNote=`Roll back to version ${v}`;S.ui.changeNote=undefined;S.sec="proposal";render();toast(`Your edits are version ${v} now. Add them to a proposal to make it live.`);}catch(err){toast(err.message);}},
   file(e){S.ui.exportFile=e.dataset.f;render();},
   pickIcon(e){S.ui.icon=S.ui.icon===e.dataset.n?null:e.dataset.n;render();},
   iconGrp(e){S.ui.iconGrp=e.dataset.g;render();},
@@ -1445,7 +1447,7 @@ function fmtDate(d){const t=new Date(d+"T12:00:00");return isNaN(t)?d:t.toLocale
 function mapHistory(v){return v.map(x=>({v:x.version,date:fmtDate(x.date),note:x.note||"",url:x.url||null}));}
 /* Who a change is credited to, in the offline prototype. Online, the server records the signed-in person. */
 function roleWho(){return S.me?S.me.email:"Brand team";}
-function loadState(r){S.draft=r.draft;S.published=r.published;S.base=r.base||null;S.proposal=r.proposal||null;S.notice=r.notice||null;if(!Object.hasOwn(S.draft.brands,S.ui.brand))S.ui.brand=brandList(S.draft)[0].id;S.history=mapHistory(r.history||[]);if("ai" in r){S.ai.server=!!r.ai;S.ai.model=r.model;}if(r.storybook)S.storybook=r.storybook;if(r.figma)S.figma=r.figma;if("shared" in r)S.shared=!!r.shared;if("github" in r)S.github=r.github;if(r.me){S.me=r.me;S.role=r.me.role;}lastSaved=JSON.stringify(S.draft);S.save="saved";}
+function loadState(r){S.draft=r.draft;S.published=r.published;S.engine=r.engine||null;S.base=r.base||null;S.proposal=r.proposal||null;S.notice=r.notice||null;if(!Object.hasOwn(S.draft.brands,S.ui.brand))S.ui.brand=brandList(S.draft)[0].id;S.history=mapHistory(r.history||[]);if("ai" in r){S.ai.server=!!r.ai;S.ai.model=r.model;}if(r.storybook)S.storybook=r.storybook;if(r.figma)S.figma=r.figma;if("shared" in r)S.shared=!!r.shared;if("github" in r)S.github=r.github;if(r.me){S.me=r.me;S.role=r.me.role;}lastSaved=JSON.stringify(S.draft);S.save="saved";}
 function mergeTurns(t){const o=[];t.forEach(x=>{if(o.length&&o[o.length-1].role===x.role)o[o.length-1].content+="\n\n"+x.content;else o.push({...x});});while(o.length&&o[0].role!=="user")o.shift();return o;}
 function parseLoose(t){if(!t)return null;try{return JSON.parse(t);}catch(e){}const f=t.match(/```(?:json)?\s*([\s\S]*?)```/);if(f){try{return JSON.parse(f[1]);}catch(e){}}const a=t.indexOf("{"),b=t.lastIndexOf("}");if(a>=0&&b>a){try{return JSON.parse(t.slice(a,b+1));}catch(e){}}return null;}
 let saveT=null,lastSaved="",savePromise=null;

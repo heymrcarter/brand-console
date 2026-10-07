@@ -7,6 +7,8 @@
 //   github is { repo, branch }, so the console can say where proposals go.
 // roleOf(user): "viewer", "editor", or "admin". Everyone is an admin for now; later the roles come from Microsoft
 //   Entra ID groups. The browser never decides a role: the server's role replaces any the browser sends.
+import { ENGINE_VERSION, engineBehind } from "./engine.mjs";
+
 export function createApi({ store, proposals, figma, ask, info, roleOf = () => "admin" }) {
   async function state(user) {
     // The proposal first: if it has just landed, the reads after it see the new main.
@@ -14,7 +16,7 @@ export function createApi({ store, proposals, figma, ask, info, roleOf = () => "
     const [draft, published, history, figmaStatus] = await Promise.all([store.draft(), store.published(), proposals.releases(), figma.status()]);
     const i = info();
     const me = user ? { email: user.email, name: user.name || "", role: roleOf(user) } : null;
-    return { draft, published, proposal: prop.proposal, base: prop.base, notice: prop.notice, history, ai: !!i.ai, model: i.ai ? i.model : null, storybook: i.storybook, figma: figmaStatus, github: i.github || null, me };
+    return { draft, published, engine: { version: ENGINE_VERSION, behind: engineBehind(published.version) }, proposal: prop.proposal, base: prop.base, notice: prop.notice, history, ai: !!i.ai, model: i.ai ? i.model : null, storybook: i.storybook, figma: figmaStatus, github: i.github || null, me };
   }
   const who = (user) => (user ? { email: user.email, name: user.name || "" } : {});
   const withRole = (b, user) => ({ ...b, role: roleOf(user) });

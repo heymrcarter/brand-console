@@ -15,7 +15,7 @@ function setup(files = sampleFiles()) {
 test("the draft has the edits, live does not, and both carry the version in package.json", async () => {
   const { store, live } = setup();
   const d = await store.draft();
-  assert.equal(d.version, "1.5.0");
+  assert.equal(d.version, "1.0.0");
   d.shape.radius += 3;
   await store.saveDraft(d);
   assert.equal((await store.draft()).shape.radius, d.shape.radius);

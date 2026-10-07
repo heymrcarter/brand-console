@@ -63,7 +63,7 @@ The sample design system has four released versions, and passes every check. You
 3. **Change something.** Change the button **Corners** to **Round ends**. The console's own preview changes right away. The real component shows the design system version the console uses, so it does not change until a new version is released.
 4. **Propose it.** Open **Proposal**. Your edits are listed. Check the note the console wrote, pick the kind of change (it suggests one), and click **Start the proposal**. That opens a draft pull request on the stand-in for GitHub, with your edits as one commit. Edit something else and add it as a second change. Click **Undo this change** on the first one: its values come back as edits, to add as a change that reverses it. Then click **Submit for review**.
 5. **Land it.** Nobody reviews pull requests on your computer, so `npm start` prints a `curl` command that lands it the way a reviewer would. Run it, then reload the console: it says the proposal landed, and **Live** shows the new version. Or use the other command to withdraw it: your edits stay.
-6. **Roll back.** Open **Versions** and roll back to 1.3.0. Your edits become that version, and anything you edited on top of the live version stays. It reaches apps only when you add it to a proposal and it lands.
+6. **Roll back.** Open **Versions** and roll back to 0.3.0. Your edits become that version, and anything you edited on top of the live version stays. It reaches apps only when you add it to a proposal and it lands.
 7. **Look at the icons.** Open **Icons** under Foundations. Point at any icon to see its name. Click one to see its sizes and the code engineers use. Change **Line thickness** to make every icon bolder.
 8. **Give the page a gradient or a picture.** Open **Color** and find **Page style**. Pick **Gradient** or **Picture**. For a picture, the guide makes one from your brand colors first. You can keep it or upload your own. Then slide **Window and card see-through** to let the page show behind cards. The checks test the words on every part of the page.
 9. **Pick fonts.** Open **Type**. Pick a heading font, a body font, and a font for labels and navigation. Buttons use the label font. Try the **Elegant** set: Cormorant Garamond Italic headings, Atkinson Hyperlegible body text, and Avenir Next labels. Avenir Next and Avenir Next Mono need a license. Until your company adds the font files, the console shows a free look-alike. The checks warn you if a font is hard to read where you put it.
@@ -78,7 +78,7 @@ The sample design system has four released versions, and passes every check. You
 
 ## Start over with the sample data
 
-The sample design system in `fixtures/sample/` is shaped like the design system repository: `tokens/` is main at version 1.5.0, `history/` holds the tokens of 1.2.0 to 1.4.0, and `releases.json` their notes. This writes it again from scratch:
+The sample design system in `fixtures/sample/` is shaped like the design system repository: `tokens/` is main at version 1.0.0, `history/` holds the tokens of 0.2.0 to 0.4.0, and `releases.json` their notes. This writes it again from scratch:
 ```
 npm run reset-sample-data
 ```
@@ -129,4 +129,5 @@ The console runs on Cloudflare Workers, with the design system in a GitHub repos
   - **New things** (minor, 1.4.0 to 1.5.0): something new is added, like a new brand, a color in a color set, or a component. Nothing is taken away.
   - **A big change** (major, 1.4.0 to 2.0.0): something apps use is removed or renamed, like a brand or a CSS variable. Apps may need changes.
   The console compares the edits with the proposal, or with live, and suggests one. The brand team can pick another.
+- **The console follows releases.** `server/engine.mjs` knows the engine's version, from the package. Each design system release starts `.github/workflows/follow-design-system.yml`, which moves the console to it and deploys. While the live version is a newer minor or major version than the engine, the console pauses new changes to proposals (`engineBehind`), because its checks may not know the new things yet.
 - **Sign-in:** Cloudflare Access signs people in, and the Worker checks its token on every request (`worker/access.mjs`). Everyone is an admin for now. Roles (Viewer, Editor, and Admin) are planned, with Microsoft Entra ID groups deciding who has which.

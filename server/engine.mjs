@@ -2,8 +2,21 @@
 // console's checks and outputs are the same as the design system's own build.
 // Every name it exports is handed back on one object, E, so there is no list to keep up to date here.
 import * as engine from "@heymrcarter/design-system/engine";
+import pkg from "@heymrcarter/design-system/package.json" with { type: "json" };
 
 export const ENGINE_MODULES = { engine };
+/** The design system version whose engine the console runs. Each release updates it (see follow-design-system.yml). */
+export const ENGINE_VERSION = pkg.version;
+
+/**
+ * True when the design system's live version has new things the console's engine does not know yet: a newer minor
+ * or major version. A newer patch only changes values, which the engine reads from the tokens, so it is not behind.
+ */
+export function engineBehind(live, engine = ENGINE_VERSION) {
+  const p = (v) => String(v || "0.0.0").split(".").map((n) => parseInt(n, 10) || 0);
+  const [lm, ln] = p(live), [em, en] = p(engine);
+  return lm > em || (lm === em && ln > en);
+}
 
 // Node code gets its own copies of the engine's objects, so changing one can never change the engine itself.
 // Values that hold functions (like the component registry) cannot be copied, so they are passed through as they are.

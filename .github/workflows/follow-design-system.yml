@@ -1,0 +1,82 @@
+# Keeps the console on the design system's newest release, so its engine, checks, and Storybook match what has
+# landed. It never changes the design system: it only moves this repository's package.json and lockfile.
+#   1. Reads the newest @heymrcarter/design-system version from GitHub Packages.
+#   2. If the console runs an older one, installs that version of both packages, and runs the tests.
+#   3. Commits the update to main as "Use design system X", and starts the deploy.
+# The design system's Release workflow starts this after each release, with a token that can only start workflows
+# here (CONSOLE_DISPATCH_TOKEN in the design system repository). A daily run catches any release it missed.
+# While the console's engine is a minor or major version behind, it pauses new changes to proposals.
+name: Follow the design system
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The design system version that was just released (optional; the newest is used)"
+        required: false
+  schedule:
+    - cron: "17 6 * * *"
+
+# contents: write commits the update. actions: write starts the deploy, which a commit made with this workflow's
+# own token would not. packages: read installs the private packages.
+permissions:
+  contents: write
+  actions: write
+  packages: read
+
+# One at a time, and after any deploy that is running.
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+jobs:
+  follow:
+    # Only this repository follows the design system. Copies and forks of it never do.
+    if: github.repository == 'heymrcarter/brand-console'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: "@heymrcarter"
+      - name: Is there a newer release?
+        id: check
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: |
+          have=$(node -p "require('./package.json').dependencies['@heymrcarter/design-system']")
+          newest=$(npm view @heymrcarter/design-system version)
+          echo "The console runs $have. The newest release is $newest."
+          if [ "$have" = "$newest" ]; then echo "update=false" >> "$GITHUB_OUTPUT"; else echo "update=true" >> "$GITHUB_OUTPUT"; echo "version=$newest" >> "$GITHUB_OUTPUT"; fi
+      - name: Install it
+        if: steps.check.outputs.update == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: |
+          v="${{ steps.check.outputs.version }}"
+          npm install --save-exact "@heymrcarter/design-system@$v" "@heymrcarter/design-system-storybook@$v"
+      - if: steps.check.outputs.update == 'true'
+        run: npm test
+      - if: steps.check.outputs.update == 'true'
+        run: npm run test:worker
+        timeout-minutes: 5
+      - name: Commit it, and deploy
+        if: steps.check.outputs.update == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${{ steps.check.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -qm "Use design system $v"
+          git pull -q --rebase origin main
+          git push -q origin HEAD:main
+          gh workflow run deploy-worker.yml --ref main
+          echo "Updated to $v, and started the deploy."

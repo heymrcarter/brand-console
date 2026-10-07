@@ -8,10 +8,11 @@ import { createGitHubClient } from "../server/github-client.mjs";
 import { createGitHubStorage } from "../server/storage/github.mjs";
 import { createMemoryStorage, createMemoryKV } from "../server/storage/memory.mjs";
 import { sampleRepo } from "./helpers/sample-repo.mjs";
+import { engineBehind, ENGINE_VERSION } from "../server/engine.mjs";
 
 const REPO = "acme/design-system", TOKEN = "test-token", MAYA = { email: "maya@example.com", name: "Maya R." };
 
-function setup(opts = {}) {
+function setup({ engineVersion, ...opts } = {}) {
   const mock = sampleRepo({ repo: REPO, token: TOKEN, ...opts });
   let clock = Date.parse("2026-10-07T10:00:00Z");
   const now = () => new Date((clock += 1000));
@@ -19,7 +20,7 @@ function setup(opts = {}) {
   const storage = gh(createMemoryStorage()), live = gh(createMemoryStorage());
   const store = createStore(storage, { live });
   const github = createGitHubClient({ repo: REPO, token: TOKEN, fetch: mock.fetch });
-  const proposals = createProposals({ github, store, edits: storage, kv: createMemoryKV(), previewUrl: "https://pr-{number}-sb.example.workers.dev", now });
+  const proposals = createProposals({ github, store, edits: storage, kv: createMemoryKV(), previewUrl: "https://pr-{number}-sb.example.workers.dev", now, engineVersion: engineVersion || "1.0.0" });
   const edit = async (fn) => { const d = await store.draft(); fn(d); await store.saveDraft(d); };
   const changesets = (branch) => Object.keys(mock.files(branch)).filter((p) => /^\.changeset\/console-/.test(p)).map((p) => mock.text(p, branch));
   return { mock, store, proposals, edit, changesets, E: store.E };
@@ -28,7 +29,7 @@ function setup(opts = {}) {
 test("live is main: its tokens and its package.json version. Edits are saved in the console, never on main", async () => {
   const { mock, store, edit } = setup();
   const live = await store.published();
-  assert.equal(live.version, "1.5.0");
+  assert.equal(live.version, "1.0.0");
   assert.ok(live.brands.northfield.palette, "main has the color sets");
   const before = mock.head();
   await edit((d) => { d.shape.radius += 2; });
@@ -53,7 +54,7 @@ test("the first change opens a draft pull request, with one commit and a changes
   assert.equal(pr.draft, true);
   assert.equal(pr.title, "Rounder corners");
   assert.match(pr.body, /1\. Rounder corners _\(fix, maya@example\.com\)_/);
-  assert.match(pr.body, /releases version 1\.5\.1/);
+  assert.match(pr.body, /releases version 1\.0\.1/);
   const branch = s.proposal.branch;
   assert.match(branch, /^proposal\/2026-10-07-rounder-corners$/);
   assert.deepEqual(changesets(branch), ['---\n"@heymrcarter/design-system": patch\n---\n\nRounder corners\n']);
@@ -75,7 +76,7 @@ test("more changes go on the same pull request, each its own commit; the biggest
   assert.equal(s.proposal.bump, "minor");
   assert.equal(mock.pulls().length, 1);
   assert.match(mock.pull(1).body, /2\. Add the Harbor brand _\(new things/);
-  assert.match(mock.pull(1).body, /releases version 1\.6\.0/);
+  assert.match(mock.pull(1).body, /releases version 1\.1\.0/);
   assert.equal(changesets(s.proposal.branch).length, 2);
   assert.ok(mock.text("tokens/brands/harbor.tokens.json", s.proposal.branch));
   assert.deepEqual(mock.log(s.proposal.branch).slice(0, 2).map((m) => m.split("\n")[0]), ["Add the Harbor brand", "Rounder corners"]);
@@ -149,16 +150,16 @@ test("a proposal that lands: the console says so, live moves to the new version,
   await edit((d) => { d.shape.radius += 2; });
   await proposals.add({ note: "Rounder corners", who: MAYA });
   await proposals.submit();
-  assert.equal((await proposals.releases()).at(0).version, "1.5.0");
-  mock.merge(1, { release: "1.5.1" });
+  assert.equal((await proposals.releases()).at(0).version, "1.0.0");
+  mock.merge(1, { release: "1.0.1" });
   const s = await proposals.status();
   assert.equal(s.proposal, null);
   assert.deepEqual({ kind: s.notice.kind, number: s.notice.number, title: s.notice.title }, { kind: "landed", number: 1, title: "Rounder corners" });
   const live = await store.published();
-  assert.equal(live.version, "1.5.1");
+  assert.equal(live.version, "1.0.1");
   assert.equal(E.diff(live, await store.draft()).length, 0);
   assert.equal((await proposals.dismiss()).notice, null);
-  assert.equal((await proposals.releases()).at(0).version, "1.5.1", "seeing it land refreshes the release list");
+  assert.equal((await proposals.releases()).at(0).version, "1.0.1", "seeing it land refreshes the release list");
 });
 
 test("a proposal that is withdrawn, on GitHub or in the console: its branch goes, and the edits stay", async () => {
@@ -210,10 +211,25 @@ test("each change remembers the values before it, so it can be undone with a cha
 test("rolling back makes the edits an earlier version, keeping edits made since", async () => {
   const { store, proposals, edit } = setup();
   await edit((d) => { d.type.scale = 1.333; });
-  const v13 = await proposals.stateOfVersion("1.3.0");
+  const v13 = await proposals.stateOfVersion("0.3.0");
   const d = await store.restore(v13);
   assert.equal(d.brands.northfield.primary, v13.brands.northfield.primary);
   assert.equal(d.type.scale, 1.333, "the edit made on top of live stays");
   await assert.rejects(proposals.stateOfVersion("9.9.9"), /has no tag/);
-  assert.deepEqual((await proposals.releases()).map((r) => r.version), ["1.5.0", "1.4.0", "1.3.0", "1.2.0"]);
+  assert.deepEqual((await proposals.releases()).map((r) => r.version), ["1.0.0", "0.4.0", "0.3.0", "0.2.0"]);
+});
+
+test("while the console's engine is a minor or major version behind live, no change can be added; a patch behind is fine", async () => {
+  assert.equal(engineBehind("1.1.0", "1.0.4"), true, "a newer minor");
+  assert.equal(engineBehind("2.0.0", "1.9.9"), true, "a newer major");
+  assert.equal(engineBehind("1.0.7", "1.0.2"), false, "a newer patch only changes values");
+  assert.equal(engineBehind("1.0.0", "1.2.0"), false, "an engine ahead of live is fine");
+  assert.match(ENGINE_VERSION, /^\d+\.\d+\.\d+$/, "the console knows its engine's version");
+  const behind = setup({ engineVersion: "0.4.0" });
+  await behind.edit((d) => { d.shape.radius += 2; });
+  await assert.rejects(behind.proposals.add({ note: "Rounder corners", who: MAYA }), (e) => e.status === 409 && /still updating to it \(it runs 0\.4\.0\)/.test(e.message));
+  assert.equal(behind.mock.pulls().length, 0);
+  const patchBehind = setup({ engineVersion: "1.0.0" });
+  await patchBehind.edit((d) => { d.shape.radius += 2; });
+  assert.equal((await patchBehind.proposals.add({ note: "Rounder corners", who: MAYA })).proposal.number, 1);
 });

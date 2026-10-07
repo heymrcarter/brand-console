@@ -1,6 +1,6 @@
 // Remakes the sample design system in fixtures/sample, shaped like the design system repository:
-//   history/v1.2.0/ ... v1.4.0/   the tokens of each earlier version (tagged releases on the GitHub stand-in)
-//   tokens/                       main, at the newest version, 1.5.0, with the official color sets
+//   history/v0.2.0/ ... v0.4.0/   the tokens of each earlier version (tagged releases on the GitHub stand-in)
+//   tokens/                       main, at the newest version, 1.0.0, with the official color sets
 //   releases.json                 each version's date and note
 // The tests, npm start, and the prototype use it. Run with:  npm run reset-sample-data
 import fs from "node:fs";
@@ -48,11 +48,11 @@ const base = E.withDefaults({ ...E.clone(E.BASE), brands: E.clone(BRANDS) });
 const v12 = E.clone(base); v12.brands.northfield.primary = "#7A3F92"; v12.type.scale = 1.2; v12.shape.radius = 6; v12.comp.card.shadow = "none";
 const v13 = E.clone(base); v13.brands.northfield.primary = "#7A3F92"; v13.type.scale = 1.2;
 
-writeTokens(path.join(sample, "history/v1.2.0"), v12);
-writeTokens(path.join(sample, "history/v1.3.0"), v13);
-writeTokens(path.join(sample, "history/v1.4.0"), base);
+writeTokens(path.join(sample, "history/v0.2.0"), v12);
+writeTokens(path.join(sample, "history/v0.3.0"), v13);
+writeTokens(path.join(sample, "history/v0.4.0"), base);
 
-// Main, 1.5.0: the official color sets for both brands, a new body font, and roomier buttons.
+// Main, 1.0.0: the official color sets for both brands, a new body font, and roomier buttons.
 const d = E.clone(base);
 d.brands.crestline.palette = E.clone(PALETTES.crestline);
 Object.assign(d.brands.crestline, { primary: "#1A3DA3", secondary: "#4AA1CC", accent: "#8ABC3F" });
@@ -63,9 +63,9 @@ d.type.ui = "Public Sans";
 Object.assign(d.comp.button, { track: "wide", pad: "roomy" });
 writeTokens(path.join(sample, "tokens"), d);
 fs.writeFileSync(path.join(sample, "releases.json"), JSON.stringify([
-  { version: "1.2.0", date: "2026-08-04", note: "Added the employee screen size. Employee screens now fit more rows on one page." },
-  { version: "1.3.0", date: "2026-08-29", note: "Changed the Northfield main color to a deeper plum so white button words are easier to read." },
-  { version: "1.4.0", date: "2026-09-18", note: "Made the card shadow softer and raised the type scale so headings stand out more on consumer screens." },
-  { version: "1.5.0", date: "2026-10-02", note: "Added the official color sets for both brands, a body font that is easier to read, and roomier buttons." },
+  { version: "0.2.0", date: "2026-08-04", note: "Added the employee screen size. Employee screens now fit more rows on one page." },
+  { version: "0.3.0", date: "2026-08-29", note: "Changed the Northfield main color to a deeper plum so white button words are easier to read." },
+  { version: "0.4.0", date: "2026-09-18", note: "Made the card shadow softer and raised the type scale so headings stand out more on consumer screens." },
+  { version: "1.0.0", date: "2026-10-02", note: "Added the official color sets for both brands, a body font that is easier to read, and roomier buttons." },
 ], null, 2).replace(/\n    /g, " ").replace(/\n  \}/g, " }") + "\n");
-console.log("Sample data remade: versions 1.2.0, 1.3.0, 1.4.0, and main at 1.5.0 with 2 color sets.");
+console.log("Sample data remade: versions 0.2.0, 0.3.0, 0.4.0, and main at 1.0.0 with 2 color sets.");

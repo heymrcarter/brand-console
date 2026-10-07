@@ -14,6 +14,7 @@
 // never has merge conflicts: for the files the console writes, the console's version wins. History is never
 // rewritten: undoing a change is a new change that puts the values back.
 import { gitBlobSha } from "./storage/github.mjs";
+import { ENGINE_VERSION, engineBehind } from "./engine.mjs";
 
 const plainErr = (status, message) => Object.assign(new Error(message), { status });
 const KINDS = { patch: "fix", minor: "new things", major: "a big change" };
@@ -26,8 +27,10 @@ const fontFiles = (st) => Object.values((st && st.fontLib && st.fontLib.files) |
  * edits: the store's storage, where uploaded font files wait. kv: { get(key), set(key, value) } that lasts.
  * previewUrl: optional "https://pr-{number}-...workers.dev", where each pull request's Storybook is.
  * onLanded: called when a proposal has landed, so storages that keep main's commit for a while read it again.
+ * engineVersion: the design system version whose engine the console runs. While the live version is a newer minor
+ *   or major version, no change can be added: the console updates itself on each release, in a few minutes.
  */
-export function createProposals({ github, store, edits, kv, base = "main", previewUrl = "", onLanded = () => {}, now = () => new Date() }) {
+export function createProposals({ github, store, edits, kv, base = "main", previewUrl = "", onLanded = () => {}, engineVersion = ENGINE_VERSION, now = () => new Date() }) {
   const E = store.E;
   const states = new Map(); // commit sha -> state. A commit never changes, so neither does its state.
   let releases = null; // { at, list }: the release list, kept for a minute.
@@ -126,6 +129,7 @@ export function createProposals({ github, store, edits, kv, base = "main", previ
     if (!note) throw plainErr(400, "Write a short note that says what this change does.");
     if (note.length > 300) throw plainErr(400, "Keep the note under 300 characters. The pull request can say more.");
     const rec = await refresh(), live = await store.published(), draft = E.withDefaults(E.clone(await store.draft()));
+    if (engineBehind(live.version, engineVersion)) throw plainErr(409, `The design system is at version ${live.version}, and the console is still updating to it (it runs ${engineVersion}). Your edits are saved. Try again in a few minutes.`);
     const before = rec ? await stateAt(rec.head) : live;
     const edited = E.diff(before, draft);
     if (!edited.length) throw plainErr(409, rec ? "There are no edits to add. Everything is in the proposal already." : "There are no edits to add yet.");
