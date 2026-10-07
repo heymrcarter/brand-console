@@ -6,7 +6,7 @@ const S={
   sec:"color",
   published:null,
   draft:null,
-  ui:{brand:"northfield",q:"",openCats:{},mode:"light",ba:false,baPos:50,chrome:null,compare:false,ctx:"consumer",size:"large",vp:"desktop",asst:window.innerWidth>1100,exportFile:"theme.css",src:"sample",baBase:"last",publishNote:null,confirmRb:null},
+  ui:{brand:"",q:"",openCats:{},mode:"light",ba:false,baPos:50,chrome:null,compare:false,ctx:"consumer",size:"large",vp:"desktop",asst:window.innerWidth>1100,exportFile:"theme.css",src:"sample",baBase:"last",publishNote:null,confirmRb:null},
   history:[],
   storybook:"http://127.0.0.1:6006",
   save:"saved", saveErr:"",
@@ -17,6 +17,7 @@ const S={
 };
 
 function showVal(p,v){
+  if(v===undefined) return `<span class="under">None</span>`;
   if(typeof v==="string"&&hexOk(v)&&v.startsWith("#")) return `<span class="sw" style="background:${v}"></span>${v}`;
   if(p.startsWith("guidance")) return "new text";
   if(p.startsWith("comp.")){const ks=p.split(".");const sl=slotOf(ks[1],ks[2]);const o=sl&&sl.opts.find(([x])=>String(x)===String(v));if(o) return esc(o[1]);}
@@ -27,7 +28,19 @@ function showVal(p,v){
   if(p==="comp.dialog.order") return v==="end"?"Main button on the right":"Main button on the left";
   if(p==="comp.button.case") return v==="upper"?"ALL CAPITALS":"Sentence case";
   return esc(String(v));}
-function undoPath(p){const v=getP(S.published,p);if(v===undefined){const ks=p.split(".");delete getP(S.draft,ks.slice(0,-1).join("."))[ks[ks.length-1]];}else setP(S.draft,p,clone(v));}
+/* Brands are data: the draft's brands, in order. The first one is the default. */
+function brands(){return brandList(S.draft);}
+function bn(id){return brandName(S.draft,id);}
+/* Undo puts a setting back the way it is live. A whole brand added or removed, and the brand order, are one change each. */
+function undoPath(p){
+  if(p==="brandOrder"){const pub=Object.keys(S.published.brands),cur=Object.keys(S.draft.brands);
+    S.draft.brands=Object.fromEntries([...pub.filter(id=>cur.includes(id)),...cur.filter(id=>!pub.includes(id))].map(id=>[id,S.draft.brands[id]]));return;}
+  const wb=p.match(/^brands\.([^.]+)$/);
+  if(wb){const id=wb[1],was=S.published.brands[id];
+    if(!was){if(Object.keys(S.draft.brands).length<2){toast("A design system needs at least one brand, so I kept this one.");return;}delete S.draft.brands[id];return;}
+    const order=Object.keys(S.draft.brands);order.splice(Math.min(Object.keys(S.published.brands).indexOf(id),order.length),0,id);
+    S.draft.brands=Object.fromEntries(order.map(x=>[x,x===id?clone(was):S.draft.brands[x]]));return;}
+  const v=getP(S.published,p);if(v===undefined){const ks=p.split(".");delete getP(S.draft,ks.slice(0,-1).join("."))[ks[ks.length-1]];}else setP(S.draft,p,clone(v));}
 /* =====================================================================
    HELPERS
    ===================================================================== */
@@ -46,6 +59,7 @@ const I={
     figma:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg>',
     icons:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.9L22 10l-5.5 4.6L18.2 22 12 18.3 5.8 22l1.7-7.4L2 10l7.1-1.1z"/></svg>',
     library:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+    brands:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="8" height="8" rx="2"/><rect x="13" y="4" width="8" height="8" rx="2"/><rect x="3" y="14" width="8" height="6" rx="2"/><path d="M17 14v6M14 17h6"/></svg>',
     color:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="8.5" cy="10" r="1.3" fill="currentColor"/><circle cx="12" cy="7.5" r="1.3" fill="currentColor"/><circle cx="15.5" cy="10" r="1.3" fill="currentColor"/><path d="M12 21a3 3 0 0 1 0-6h2"/></svg>',
     type:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5h16v2M12 5v14M9 19h6"/></svg>',
     space:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16M20 4v16M8 12h8M8 12l2-2M8 12l2 2M16 12l-2-2M16 12l-2 2"/></svg>',
@@ -76,7 +90,7 @@ const changes=()=>diff(S.published,S.draft);
    NAV
    ===================================================================== */
 const NAV=[
-  ["Foundations",[["color","Color"],["type","Type"],["space","Spacing and size"],["shape","Corners and shadows"],["icons","Icons"]]],
+  ["Foundations",[["brands","Brands"],["color","Color"],["type","Type"],["space","Spacing and size"],["shape","Corners and shadows"],["icons","Icons"]]],
   ["Components",[]],
   ["Release",[["checks","Checks"],["publish","Review and publish"],["history","Versions"],["export","Use it in apps and Figma"],["figma","Sync with Figma"]]]];
 const CAT_ICON={actions:"button",inputs:"field",structure:"field",feedback:"checks",content:"card",navigation:"export",overlays:"dialog",data:"select",layout:"shape",health:"checks"};
@@ -84,6 +98,7 @@ function nrow(id,l,m="",cls=""){return `<button class="nrow${cls}${S.sec===id?" 
 function nav(){
   const k=counts(), ch=changes().length, q=(S.ui.q||"").trim().toLowerCase();
   const meta=id=>{if(id==="checks") return k.block?`<span class="m bad">${k.block} to fix</span>`:k.warn?`<span class="m">${k.warn} tips</span>`:"";
+    if(id==="brands") return `<span class="m">${brands().length}</span>`;
     if(id==="publish"&&ch) return `<span class="m">${ch} change${ch>1?"s":""}</span>`;if(id==="history") return `<span class="m">v${S.published.version}</span>`;
     if(id==="figma") return S.figma&&S.figma.connected?`<span class="m">${S.figma.lastSync?agoShort(S.figma.lastSync):"Ready"}</span>`:"";return "";};
   const curCat=REG[S.sec]&&REG[S.sec].cat;
@@ -103,7 +118,7 @@ function nav(){
     <div class="draftbox"><div class="dt">${dt}</div>${canEdit()?`<div class="btns">${btn("Review and publish","go",{p:1,s:1,data:{s:"publish"},dis:!ch})}</div>`:""}<div class="under">${ds}</div><div class="under" id="savenote" aria-live="polite"></div></div></nav>`;
 }
 function topbar(){
-  return `<div class="top"><div style="display:flex;align-items:center;gap:12px;min-width:0"><div class="gbadge" style="width:26px;height:26px;border-radius:7px;background:conic-gradient(${BRANDS.map((b,i)=>`${S.draft.brands[b.id].primary} ${i*100/BRANDS.length}% ${(i+1)*100/BRANDS.length}%`).join(",")})"></div><div class="t">Brand Console</div><div class="v hide-s">Design system for 2 brands</div></div>
+  return `<div class="top"><div style="display:flex;align-items:center;gap:12px;min-width:0"><div class="gbadge" style="width:26px;height:26px;border-radius:7px;background:conic-gradient(${brands().map((b,i)=>`${S.draft.brands[b.id].primary} ${i*100/brands().length}% ${(i+1)*100/brands().length}%`).join(",")})"></div><div class="t">Brand Console</div><div class="v hide-s">Design system for ${brands().length} brand${brands().length>1?"s":""}</div></div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">${S.me?`<span class="who hide-s" title="Signed in as ${esc(S.me.email)}">${esc(S.me.name||S.me.email)}</span>`:""}${S.offline?"":`<a class="sblink hide-s" href="${esc(S.storybook)}" target="_blank" rel="noopener">Open Storybook</a>`}<span class="pill ok">Live: v${S.published.version}</span>${changes().length?`<span class="pill warn hide-s">Draft open</span>`:""}</div></div>`;
 }
 
@@ -147,13 +162,15 @@ function preview(kind){
     const base=useLast?S.beforeLast:S.published;
     const left=useLast?`Before: ${esc(S.lastEditLabel||"your last change")}`:`Before: live version ${S.published.version}`;
     const right=useLast?"After: your draft now":`After: your draft${n?` · ${n} change${n>1?"s":""}`:""}`;
-    body=`<div class="ba-tags"><span class="ba-tag">${I.chevL} ${left}</span><span class="ba-tag">${right} ${I.chevR}</span></div><div class="ba" id="ba" style="--pos:${u.baPos}%"><div class="ba-l">${frame(base,kind)}</div><div class="ba-r">${frame(st,kind)}</div><div class="ba-line" aria-hidden="true"><span>${I.chevL}${I.chevR}</span></div></div>
+    /* A brand added in this draft has nothing to compare with yet. */
+    if(!Object.hasOwn(base.brands,u.brand)) body=`<div class="ba-tags"><span class="ba-tag">${esc(bn(u.brand))} is new. ${useLast?"It was not there before your last change.":`It is not in live version ${S.published.version} yet.`}</span></div>${frame(st,kind)}`;
+    else body=`<div class="ba-tags"><span class="ba-tag">${I.chevL} ${left}</span><span class="ba-tag">${right} ${I.chevR}</span></div><div class="ba" id="ba" style="--pos:${u.baPos}%"><div class="ba-l">${frame(base,kind)}</div><div class="ba-r">${frame(st,kind)}</div><div class="ba-line" aria-hidden="true"><span>${I.chevL}${I.chevR}</span></div></div>
       <div class="ba-ctl"><label for="baslider" class="under">Drag the line, or use this slider, to compare.</label><input type="range" id="baslider" min="0" max="100" value="${u.baPos}" aria-label="Move the line between before and after"></div>
       ${u.baBase==="last"&&!S.beforeLast?`<p class="under" style="margin-top:8px">Make a change on any page to compare it here. Until then, this shows the live version on the left.</p>`:(!useLast&&!n)?`<p class="under" style="margin-top:8px">Your draft has no changes yet, so both sides look the same.</p>`:""}`;
   }
   return `<div class="pvcol" id="pvcol">${pvControls()}<div class="pvbody" id="pvbody"><div class="reachwrap"><div class="reach" id="reach" aria-live="polite"></div></div>${note}${body}<div class="pickbox" id="pickbox" hidden><span></span></div></div></div>`;
 }
-function pvBar(){const b=BN[S.ui.brand];
+function pvBar(){const b=bn(S.ui.brand);
   return `<div class="pv-bar"><div class="pv-logo"><i></i>${esc(b)}</div><div class="pv-row" style="gap:12px"><span class="lnk small">Help</span><span class="pv-badge brand small">JM</span></div></div>`;}
 function consumerScreen(){
   return `${pvBar()}<div class="pv-main">
@@ -266,7 +283,7 @@ function bgBox(b){
   const L=lookOf(br,md), hard=L.kind!=="solid"||L.glass<1?", at the hardest spot":"";
   const worst=(f,list)=>list.reduce((w,x)=>contrast(f,x)<contrast(f,w)?x:w,list[0]);
   const pr=(n,f,bg)=>{const r=contrast(f,bg);const lv=r<4.5?"bad":r<7?"warn":"ok";return `<tr><td>${n}</td><td><span class="aa" data-sample="1" style="background:${bg};color:${f}">Aa</span></td><td class="num">${fmt(r)} : 1</td><td><span class="pill ${lv}">${lv==="bad"?"Too low":lv==="warn"?"Passes. 7 is better.":"Easy to read"}</span></td></tr>`;};
-  return `<div class="box"><div class="bt">Backgrounds</div><div class="bs">Pick the page and window colors for each mode. They come from the ${esc(BN[b])} color set, so they always fit the brand. Borders, help text, and links adjust to them on their own.</div>
+  return `<div class="box"><div class="bt">Backgrounds</div><div class="bs">Pick the page and window colors for each mode. They come from the ${esc(bn(b))} color set, so they always fit the brand. Borders, help text, and links adjust to them on their own.</div>
     <div class="field"><span class="fl">Mode you are editing</span>${seg("ui.mode",md,[["light","Light mode"],["dark","Dark mode"]],{label:"Mode you are editing"})}<span class="hint">This also switches the preview.</span></div>
     ${row("page","Page background","The color behind everything on the page.")}
     ${row("card","Window and card background","Cards, pop-ups, menus, and drawers sit on this color.")}
@@ -290,6 +307,35 @@ function btnPicker(b){
   const m=L["action.primary"];
   if(cur!=="action.primary"&&word(x.fg)==="dark"&&m&&word(m.fg)==="white"&&m.r>=4.5) say+=` If you want white words on the button, pick Main color.`;
   return `<div class="bpks" role="group" aria-label="Main button color">${tiles}</div><div class="under bpk-say">${say}</div>`;
+}
+/* Brands: add, rename, reorder, and remove them. Each brand only has its own colors; everything else is shared. */
+const BRAND_COLORS=[["primary","Main color"],["secondary","Second color"],["accent","Accent color"]];
+function brandRow(b,i,n){
+  const br=S.draft.brands[b.id],ed=canEdit(),del=S.ui.brandDel===b.id;
+  const sw=BRAND_COLORS.map(([k,l])=>`<span class="sw" style="background:${br[k]}" title="${l} ${br[k]}"></span>`).join("");
+  const conf=del?`<div class="ck block" role="alert"><span class="dotc" style="background:var(--red)"></span><div class="body"><div class="tt">Remove ${esc(b.name)}?</div><div class="dd">Apps that use data-brand="${esc(b.id)}" lose its styles. That makes the next version a big change, so engineers know to check their apps.</div><div class="btns">${btn("Remove "+b.name,"brandDel",{p:1,s:1,data:{b:b.id}})}${btn("Keep it","brandDelCancel",{s:1})}</div></div></div>`:"";
+  return `<div class="brandrow"><div class="crow"><span class="brandsw" aria-hidden="true">${sw}</span><div class="cn"><b>${esc(b.name)}${i===0?` <span class="pill neutral">Default</span>`:""}</b><span>Apps use data-brand="${esc(b.id)}"</span></div>
+    ${ed?`<div class="btns">${btn("Move up","brandMove",{s:1,data:{b:b.id,to:i-1},dis:i===0})}${btn("Move down","brandMove",{s:1,data:{b:b.id,to:i+1},dis:i===n-1})}${btn("Remove","brandDelAsk",{s:1,data:{b:b.id},dis:n<2})}</div>`:""}</div>
+    <div class="brandfields"><div class="field"><label class="fl" for="bname-${b.id}">Name</label><input class="inp" id="bname-${b.id}" value="${esc(b.name)}" data-bren="name" data-b="${b.id}" maxlength="40"></div>
+    <div class="field"><label class="fl" for="bdiv-${b.id}">Description</label><input class="inp" id="bdiv-${b.id}" value="${esc(b.div)}" data-bren="division" data-b="${b.id}" maxlength="80" placeholder="Like Consumer division"></div></div>${conf}</div>`;
+}
+function brandAdder(){
+  const A=S.ui.brandAdd;
+  if(!A) return `<div style="display:flex;flex-direction:column;gap:6px"><div class="btns">${btn("Add a brand","brandAddOpen",{s:1})}</div><div class="under">A new brand starts with its own three colors. Fonts, corners, and components are shared, so it fits in right away.</div></div>`;
+  const colors=BRAND_COLORS.map(([k,l])=>{const v=hexOk(A[k]||"")?normHex(A[k]):"";return `<div class="crow"><input type="color" id="badd-pick-${k}" value="${(v||"#888888").toLowerCase()}" data-badd="${k}" aria-label="${l} picker"><div class="cn"><b>${l}</b><span>${k==="primary"?"Buttons, links, and focus rings use it.":k==="secondary"?"Soft backgrounds and tags use it.":"Small highlights use it."}</span></div><input class="inp hex" id="badd-hex-${k}" value="${v}" data-badd="${k}" maxlength="7" placeholder="#000000" aria-label="${l} hex code"></div>`;}).join("");
+  return `<div class="paladd"><div class="bt" style="font-size:14px">Add a brand</div>
+    <div class="field"><label class="fl" for="badd-name">Name</label><input class="inp" id="badd-name" value="${esc(A.name||"")}" data-badd="name" maxlength="40" placeholder="Like Harbor Clinics"><span class="hint" id="badd-id" aria-live="polite">${brandAddIdNote()}</span></div>
+    <div class="field"><label class="fl" for="badd-div">Description</label><input class="inp" id="badd-div" value="${esc(A.division||"")}" data-badd="division" maxlength="80" placeholder="Like Clinics division"></div>
+    ${colors}
+    <div style="display:flex;flex-direction:column;gap:6px"><div class="btns">${btn("Add the brand","brandAdd",{p:1,s:1})}${btn("Cancel","brandAddClose",{s:1})}</div><div class="under" id="badd-note" aria-live="polite">${esc(A.err||"")}</div></div></div>`;
+}
+function brandAddIdNote(){const n=String((S.ui.brandAdd||{}).name||"").trim();return n?`Apps will use data-brand="${esc(brandIdFor(S.draft,n))}". The id never changes, even if you rename the brand.`:"The id that apps use is made from the name, once. It never changes, even if you rename the brand.";}
+function secBrands(){
+  const list=brands(),fig=checks().find(x=>x.id==="figma-modes");
+  return `<div class="page narrow">${designerBanner()}${head("Foundations","Brands","Each brand has its own colors. Fonts, corners, and components are shared by every brand. The first brand is the default.")}
+    <div class="box"><div class="bt">Your brands</div><div class="bs">Renaming a brand or changing the order is a fix. Adding one is new things. Removing one is a big change.</div>
+      <fieldset class="plain"${canEdit()?"":" disabled"}>${list.map((b,i)=>brandRow(b,i,list.length)).join("")}</fieldset>${fig?ckItem(fig):""}</div>
+    ${canEdit()?(S.ui.brandAdd?brandAdder():`<div class="box">${brandAdder()}</div>`):""}</div>`;
 }
 function secColor(){
   const b=S.ui.brand, br=S.draft.brands[b], c=colorsFor(S.draft,b,S.ui.mode);
@@ -330,8 +376,8 @@ function secColor(){
         :ed?`<tr class="actrow"><td colspan="4">${btn(isOpen?"Close":"Pick colors","pairOpen",{s:1,data:{r:P.id}})}${isOpen?editor(P):""}</td></tr>`:""}`;}).join("");
   const blocking=checks().filter(x=>x.level==="block"&&x.fix&&x.fix.brand===b);
   const inner=`${designerBanner()}${head("Foundations","Color","Each brand sets a main, second, and accent color. The system makes every other shade from them.")}
-    ${blocking.length?gnote(`I found a problem with ${BN[b]}. ${esc(blocking[0].detail)}`,(fixChanges(S.draft,blocking[0].fix)[0]||{}).why||"I can fix it for you.")+`<div class="btns">${btn("Fix it for me","fixCheck",{p:1,data:{id:blocking[0].id}})}${btn("Show me first","previewFix",{data:{id:blocking[0].id}})}</div>`
-      :gnote(br.palette?`I read the ${BN[b]} color set and picked the main, second, and accent colors from it. Then I made shades and checked every pair of words and background.`:"I made a full set of shades from each brand's colors. Then I checked every pair of words and background.","Change any color and I will check it again right away.")}
+    ${blocking.length?gnote(`I found a problem with ${bn(b)}. ${esc(blocking[0].detail)}`,(fixChanges(S.draft,blocking[0].fix)[0]||{}).why||"I can fix it for you.")+`<div class="btns">${btn("Fix it for me","fixCheck",{p:1,data:{id:blocking[0].id}})}${btn("Show me first","previewFix",{data:{id:blocking[0].id}})}</div>`
+      :gnote(br.palette?`I read the ${bn(b)} color set and picked the main, second, and accent colors from it. Then I made shades and checked every pair of words and background.`:"I made a full set of shades from each brand's colors. Then I checked every pair of words and background.","Change any color and I will check it again right away.")}
     <div class="box">
       ${crow("primary","Main color",S.draft.comp.button.bg==="action.primary"?"Buttons, links, and the keyboard focus outline.":"Links, checked boxes, the chosen day, and the keyboard focus outline. Your main button uses a different color.")}
       ${pick("primary")}${sc("primary")}
@@ -343,7 +389,7 @@ function secColor(){
     </div>
     ${bgBox(b)}
     ${palBox(b)}
-    <div class="box"><div class="bt">Word and background pairs for ${BN[b]} in ${S.ui.mode==="dark"?"dark":"light"} mode</div><div class="bs">The rule is 4.5 to 1 for words and 3 to 1 for outlines. For readers over 65, 7 to 1 is best. Pick colors for any pair to see its score as you click.</div>
+    <div class="box"><div class="bt">Word and background pairs for ${bn(b)} in ${S.ui.mode==="dark"?"dark":"light"} mode</div><div class="bs">The rule is 4.5 to 1 for words and 3 to 1 for outlines. For readers over 65, 7 to 1 is best. Pick colors for any pair to see its score as you click.</div>
       <div class="field"><span class="fl">Mode you are editing</span>${seg("ui.mode",md,[["light","Light mode"],["dark","Dark mode"]],{label:"Mode you are editing"})}</div>
       <div class="field"><span class="fl">Contrast goal for words</span>${seg("brands."+b+".wordGoal",best?"best":"rule",[["rule","Meet the rule: 4.5 to 1"],["best","Best for older readers: 7 to 1"]],{label:"Contrast goal for words"})}<span class="hint">The goal sets how dark links, help text, tag words, and error words are. Your brand colors stay the same. The main button is different. You set its color and words in its own row below.</span></div>
       <div class="tw"><table class="t"><thead><tr><th>Pair</th><th>Sample</th><th>Contrast</th><th>Result</th></tr></thead><tbody>${rows}</tbody></table></div></div>
@@ -360,9 +406,9 @@ const RADIX_NAMES=Object.keys(RADIX);
 const capWord=t=>t.charAt(0).toUpperCase()+t.slice(1);
 function palBox(b){
   const br=S.draft.brands[b], pal=br.palette, ed=canEdit();
-  if(!pal) return `<div class="box"><div class="bt">Full color set for ${BN[b]}</div><div class="bs">${BN[b]} does not have a color set yet. It uses the main, second, and accent colors above.</div>${ed?`<div style="display:flex;flex-direction:column;gap:6px"><div class="btns">${btn("Start a color set","palStart",{p:1,s:1,data:{b}})}</div><div class="under">I will start it with your main, second, and accent colors. Then you can add more colors.</div></div>`:""}</div>`;
+  if(!pal) return `<div class="box"><div class="bt">Full color set for ${bn(b)}</div><div class="bs">${bn(b)} does not have a color set yet. It uses the main, second, and accent colors above.</div>${ed?`<div style="display:flex;flex-direction:column;gap:6px"><div class="btns">${btn("Start a color set","palStart",{p:1,s:1,data:{b}})}</div><div class="under">I will start it with your main, second, and accent colors. Then you can add more colors.</div></div>`:""}</div>`;
   const total=pal.groups.reduce((a,g)=>a+g.colors.reduce((x,c)=>x+(c.share||0),0),0)||1;
-  const bar=`<div class="palbar" role="img" aria-label="How much each ${BN[b]} color should be used">${pal.groups.filter(g=>g.colors.length).map(g=>{const gs=g.colors.reduce((x,c)=>x+(c.share||0),0)||1;
+  const bar=`<div class="palbar" role="img" aria-label="How much each ${bn(b)} color should be used">${pal.groups.filter(g=>g.colors.length).map(g=>{const gs=g.colors.reduce((x,c)=>x+(c.share||0),0)||1;
     return `<div class="pg" style="flex:${gs} 1 0"><div class="segs">${g.colors.map(c=>`<i style="flex:${c.share||1} 1 0;background:${c.hex};box-shadow:${c.shade?`inset 0 -7px 0 ${c.shade}`:c.hex==="#FFFFFF"?"inset 0 0 0 1px #D5D0C3":"none"}" title="${esc(c.name)} ${c.hex}"></i>`).join("")}</div></div>`;}).join("")}</div>
     <div class="pleg">${pal.groups.filter(g=>g.colors.length).map(g=>`<span><i style="background:${g.colors[0].hex}${g.colors[0].hex==="#FFFFFF"?";box-shadow:inset 0 0 0 1px #D5D0C3":""}"></i>${esc(g.name)} · ${Math.round(g.colors.reduce((x,c)=>x+(c.share||0),0)/total*100)}%</span>`).join("")}</div>`;
   const roleOf=h=>[["primary","Main color"],["secondary","Second color"],["accent","Accent color"]].filter(([k])=>br[k]===h).map(([,l])=>`<span class="pill neutral">${l}</span>`).join("");
@@ -370,7 +416,7 @@ function palBox(b){
     ${g.colors.length?"":`<div class="under">This group has no colors yet.</div>`}
     ${g.colors.map((c,ci)=>{const P=`brands.${b}.palette.groups.${gi}.colors.${ci}`;const onW=contrast(c.hex,"#FFFFFF");
       return `<div class="crow"><input type="color" id="pal-${b}-${gi}-${ci}" value="${c.hex.toLowerCase()}" data-path="${P}.hex" aria-label="${esc(c.name)} picker"><div class="cn">${ed?`<input class="inp pname" id="palname-${b}-${gi}-${ci}" value="${esc(c.name)}" data-palname="${P}" maxlength="40" aria-label="Name of this color">`:`<b>${esc(c.name)}</b>`}<span>${Math.round((c.share||0)/total*100)}% of the brand's color${c.shade?` · <span style="white-space:nowrap">Darker shade <span class="sw" style="background:${c.shade};margin:0 2px 0 4px"></span>${c.shade}</span>`:""}${onW>=4.5?" · Safe for words on white":""}</span><span style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">${roleOf(c.hex)}</span></div><input class="inp hex" id="palhex-${b}-${gi}-${ci}" value="${c.hex}" data-hex="${P}.hex" maxlength="7" aria-label="${esc(c.name)} hex code">${ed?`<button type="button" class="xbtn" data-a="palDel" data-b="${b}" data-g="${gi}" data-c="${ci}" aria-label="Remove ${esc(c.name)} from the color set" title="Remove ${esc(c.name)}">${I.x||"×"}</button>`:""}</div>`;}).join("")}</div>`).join("");
-  return `<div class="box"><div class="bt">Full color set for ${BN[b]}</div><div class="bs">This is the brand's official color set. The groups and sizes show how much each color should be used. Pick the main, second, and accent colors from this set above.</div>${bar}${groups}${ed?palAdder(b):""}</div>`;
+  return `<div class="box"><div class="bt">Full color set for ${bn(b)}</div><div class="bs">This is the brand's official color set. The groups and sizes show how much each color should be used. Pick the main, second, and accent colors from this set above.</div>${bar}${groups}${ed?palAdder(b):""}</div>`;
 }
 /* Add a color to the set: pick one from the library, or type a hex code. */
 function palInfoRefresh(){const A0=S.ui.palAdd;if(!A0||!A0.b)return;const tmp=document.createElement("div");tmp.innerHTML=palAdder(A0.b);const fresh=tmp.querySelector(".libpick"),old=document.querySelector(".paladd .libpick");
@@ -382,7 +428,7 @@ function palAdder(b){
   const lib=`<div class="libgrid" role="group" aria-label="Color library">${RADIX_NAMES.map(n=>`<div class="librow"><span class="libn">${capWord(n)}</span>${RADIX[n].split(",").map((h,i)=>{const x="#"+h,on=hex===x;return `<button type="button" class="libsw${on?" on":""}" style="background:${x}" data-a="libPick" data-v="${x}" data-n="${capWord(n)} ${i+1}" aria-label="${capWord(n)} ${i+1}, ${x}" aria-pressed="${on}" title="${capWord(n)} ${i+1} ${x}"></button>`;}).join("")}</div>`).join("")}</div>
     <div class="under">Shades go from 1, the lightest, to 12, the darkest. Shade 9 is the purest color. Shades 11 and 12 are dark enough for words.</div>`;
   const info=hex?`<div class="libpick"><span class="libbig" style="background:${hex}" aria-hidden="true"></span><div class="cn"><b>${esc(A.name||hex)}</b><span>${hex} · Words on white: ${fmt(contrast(hex,"#FFFFFF"))} to 1 · White words on it: ${fmt(contrast("#FFFFFF",hex))} to 1 · Dark words on it: ${fmt(contrast(INK,hex))} to 1</span></div></div>`:"";
-  return `<div class="paladd"><div class="bt" style="font-size:14px">Add a color to the ${BN[b]} set</div>
+  return `<div class="paladd"><div class="bt" style="font-size:14px">Add a color to the ${bn(b)} set</div>
     <div class="field"><span class="fl">How to pick it</span>${seg("ui.palAddMode",S.ui.palAddMode||"library",[["library","From the color library"],["hex","Type a hex code"]],{label:"How to pick the color"})}</div>
     ${(S.ui.palAddMode||"library")==="library"?lib:`<div class="crow"><input type="color" id="paladd-pick" value="${(hex||"#3E63DD").toLowerCase()}" data-padd="hex" aria-label="New color picker"><div class="cn"><b>Hex code</b><span>Type it the way your brand guide shows it, like #6A9835.</span></div><input class="inp hex" id="paladd-hex" value="${hex}" data-padd="hex" maxlength="7" placeholder="#000000" aria-label="New color hex code"></div>`}
     ${info}
@@ -562,7 +608,7 @@ function secComp(k){
   const chip=id=>`<button class="chip" data-a="go" data-s="${id}">${esc(REG[id].name)}</button>`;
   const inner=`${designerBanner()}<div><div class="label">${CATN[RR.cat]}</div><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div class="h1">${esc(RR.name)}</div>${lvlPill(RR.level)}</div><div class="lede">${esc(RR.desc)}</div>${STORY[k]&&!S.offline?`<div class="btns" style="margin-top:10px"><a class="btn s" href="${esc(S.storybook)}/?path=/docs/${STORY[k]}--docs" target="_blank" rel="noopener">Open in Storybook</a></div>`:""}</div>
     <div class="box"><div class="bt">What you can change</div>${slots||`<div class="bs" style="margin-top:0">This component has no settings of its own. It uses your colors, type, and corners${from.length?`, and the settings of the parts it is built from`:""}.</div>`}</div>
-    <div class="box"><div class="bt">Built from these tokens</div><div class="bs">Values shown for ${BN[S.ui.brand]}, ${S.ui.ctx} screens, ${S.ui.size} text, ${S.ui.mode} mode.</div><div class="tw"><table class="t"><thead><tr><th>Part</th><th>Token</th><th>Value</th></tr></thead><tbody>${compTokRows(k)}</tbody></table></div></div>
+    <div class="box"><div class="bt">Built from these tokens</div><div class="bs">Values shown for ${bn(S.ui.brand)}, ${S.ui.ctx} screens, ${S.ui.size} text, ${S.ui.mode} mode.</div><div class="tw"><table class="t"><thead><tr><th>Part</th><th>Token</th><th>Value</th></tr></thead><tbody>${compTokRows(k)}</tbody></table></div></div>
     ${from.length||usedBy.length?`<div class="box"><div class="bt">How it fits with other components</div>${from.length?`<div class="field"><span class="fl">Built from</span><div class="chips">${from.map(chip).join("")}</div></div>`:""}${usedBy.length?`<div class="field"><span class="fl">Used inside</span><div class="chips">${usedBy.map(chip).join("")}</div></div>`:""}<span class="hint">When you change a part, every component built from it changes too.</span></div>`:""}
     <div class="box"><div class="bt">Properties</div><div class="bs">Engineers and AI tools use these names. They are the same in code, Storybook, and Figma.</div><div class="tw"><table class="t"><thead><tr><th>Name</th><th>Values</th><th>Notes</th></tr></thead><tbody>${(RR.props||[]).map(([n,t,d])=>`<tr><td><span class="tok">${esc(n)}</span></td><td class="code" style="font-size:11.5px">${esc(t)}</td><td>${esc(d)}</td></tr>`).join("")}</tbody></table></div></div>
     <div class="box"><div class="bt">Accessibility</div><div style="font-size:13px;line-height:1.6">${esc(RR.a11y||"")}</div></div>
@@ -596,9 +642,12 @@ function secChecks(){
 function releaseNote(chs){
   if(!chs.length) return "";
   const parts=chs.map(c=>{const l=labelFor(c.path);
+    if(/^brands\.[^.]+$/.test(c.path)) return c.to===undefined?`We removed the ${c.from} brand.`:`We added the ${c.to} brand.`;
+    if(c.path==="brandOrder") return `The brand order is now ${c.to}. ${c.to.split(", ")[0]} is the default.`;
+    if(/^brands\.[^.]+\.name$/.test(c.path)) return `We renamed ${c.from} to ${c.to}.`;
     if(c.path.startsWith("guidance")) return `We updated the ${l.replace("AI guidance for ","AI guidance for the ")}.`;
     const to=typeof c.to==="string"&&c.to.startsWith("#")?c.to:(c.path.endsWith("radius")&&RADII[c.to])?RADII[c.to].toLowerCase():ROLE_LABEL[c.to]?ROLE_LABEL[c.to].toLowerCase():c.to;
-    const ll=BRANDS.some(b=>l.startsWith(b.name))?l:l.charAt(0).toLowerCase()+l.slice(1);
+    const ll=brands().some(b=>l.startsWith(b.name))?l:l.charAt(0).toLowerCase()+l.slice(1);
     if(c.path.endsWith(".palette")) return `The ${ll} is now the official brand set, with ${String(c.to).toLowerCase()}.`;
     return `The ${ll} is now ${to}.`;});
   const why=chs.some(c=>c.path==="type.body"&&c.to==="Atkinson Hyperlegible")?" Atkinson Hyperlegible makes letters that look alike easier to tell apart.":"";
@@ -698,7 +747,7 @@ function figReview(){const F=S.fig;if(!F.rows)return "";
   const ex=F.extras||{colors:[],fonts:[]};
   const extras=ex.colors.length||ex.fonts.length?`<div class="figgrp"><div class="label">Also in your Figma file</div>
     ${ex.colors.length?`<div class="field"><span class="fl">Color styles that are not in a color set</span><div class="figextra">${ex.colors.map((x,i)=>{const on=(F.add||{})[i];return `<label class="figcol"><input type="checkbox" data-figadd="${i}"${on?" checked":""}><span class="sw" style="background:${x.hex}"></span><span>${esc(x.name)} <span class="under">${x.hex}</span></span></label>`;}).join("")}</div>
-      <div class="field"><label class="fl" for="fig-addto">Add the checked colors to</label><select class="sel" id="fig-addto" data-figui="addTo">${BRANDS.map(b=>`<option value="${b.id}"${(F.addTo||S.ui.brand)===b.id?" selected":""}>The ${b.name} color set</option>`).join("")}</select></div></div>`:""}
+      <div class="field"><label class="fl" for="fig-addto">Add the checked colors to</label><select class="sel" id="fig-addto" data-figui="addTo">${brands().map(b=>`<option value="${b.id}"${(F.addTo||S.ui.brand)===b.id?" selected":""}>The ${b.name} color set</option>`).join("")}</select></div></div>`:""}
     ${ex.fonts.length?`<div class="field"><span class="fl">Fonts in your text styles that are not in the font library</span><div class="btns">${ex.fonts.map(f=>btn(`Add ${f}`,"figFont",{s:1,data:{f}})).join("")}</div><span class="hint">This opens the Type page so you can add the font from Google Fonts or upload its files.</span></div>`:""}</div>`:"";
   const label=F.source==="files"?"Use these choices":"Sync now";
   const quietN=diff.filter(r=>r.status==="new"||r.status==="fixed").length,loudN=diff.length-quietN;
@@ -740,7 +789,7 @@ function figDownloadFiles(files){files.forEach((f,i)=>setTimeout(()=>{const data
   if(S.dl){S.dl.save({filename:f.name,data}).catch(()=>{});return;}
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data],{type:"application/json"}));a.download=f.name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},800);},i*350));
   toast(`Downloading ${files.length} files for Figma.`);}
-async function figReadFiles(list){return Promise.all([...list].map(f=>new Promise((ok,bad)=>{const r=new FileReader();r.onload=()=>{try{const json=JSON.parse(String(r.result));ok({name:f.name,json,...figGuessFile(f.name,json)});}catch(e){bad(new Error(`${f.name} is not a token file. Pick the .json files you exported from Figma.`));}};r.onerror=()=>bad(new Error(`I could not read ${f.name}.`));r.readAsText(f);})));}
+async function figReadFiles(list){return Promise.all([...list].map(f=>new Promise((ok,bad)=>{const r=new FileReader();r.onload=()=>{try{const json=JSON.parse(String(r.result));ok({name:f.name,json,...figGuessFile(f.name,json,S.draft)});}catch(e){bad(new Error(`${f.name} is not a token file. Pick the .json files you exported from Figma.`));}};r.onerror=()=>bad(new Error(`I could not read ${f.name}.`));r.readAsText(f);})));}
 async function figCompareFiles(){const F=S.fig,files=(F.files||[]).filter(x=>x.coll&&x.mode);if(!files.length){figSet({error:"Pick at least one file, and tell me what it is."});return;}
   figSet({busy:"compare",error:null,rows:null,outFiles:null});
   try{let r;if(S.offline){const vars=figFromFiles(files),seen=new Set(files.map(x=>x.coll));const rows=figCompare(S.draft,vars,S.figBase||null,{role:S.role}).filter(x=>seen.has(x.coll)&&(x.f!==undefined||x.status==="deleted"));r={rows};}
@@ -751,7 +800,7 @@ async function figCompareFiles(){const F=S.fig,files=(F.files||[]).filter(x=>x.c
    HELPER (assistant) — voice + typed, agent drafts, person reviews
    ===================================================================== */
 const VOICE={
-  color:"Our Northfield signature green is too light for white button words. How do we fix that without losing the green?",
+  color:"Our main color is too light for white button words. How do we fix that without losing the color?",
   type:"Is our text big enough for people over sixty five? What would you change?",
   space:"Can employee screens fit more rows without the text getting too small?",
   shape:"I want the corners to feel a little softer and friendlier.",
@@ -760,12 +809,12 @@ const VOICE={
   select:"Make the dropdown feel the same as the text fields.",
   card:"The cards feel flat. Can they stand out a bit more from the page?",
   dialog:"Can the dark layer behind a pop-up be a little lighter?",
-  _:"Make Northfield feel a little warmer, but keep it easy to read."};
+  _:"Make our main color feel a little warmer, but keep it easy to read."};
 const SUGG={
-  color:["Can I use white words on our green?","Which accent colors are safe for words?","Fix every problem for me"],
+  color:["Can I use white words on our main color?","Which accent colors are safe for words?","Fix every problem for me"],
   type:["Is our text big enough?","Pick a font for older readers"],
   button:["Should buttons use all caps?","Make buttons feel friendlier"],
-  _:["Fix every problem for me","Make Northfield feel warmer","Is our text big enough?"]};
+  _:["Fix every problem for me","Make our main color warmer","Is our text big enough?"]};
 function msgHTML(m){
   if(m.who==="me") return `<div class="msg me"><div class="me-av">MR</div><div class="body"><div class="who">You${m.voice?" · spoken":""}</div><div class="bub">${esc(m.x)}</div></div></div>`;
   const p=m.prop&&S.props[m.prop];
@@ -801,18 +850,18 @@ function addProp(changes,extra={}){const id="p"+(S.nextId++);S.props[id]={id,cha
 
 /* whitelist for anything the model proposes */
 const ALLOWED=[
-  [/^brands\.(northfield|crestline)\.(primary|secondary|accent)$/,v=>hexOk(v)?normHex(v):null],
-  [/^brands\.(northfield|crestline)\.bg\.(light|dark)\.(page|card)$/,v=>hexOk(v)?normHex(v):null],
+  [/^brands\.([a-z][a-z0-9-]*)\.(primary|secondary|accent)$/,v=>hexOk(v)?normHex(v):null],
+  [/^brands\.([a-z][a-z0-9-]*)\.bg\.(light|dark)\.(page|card)$/,v=>hexOk(v)?normHex(v):null],
   [/^gray$/,v=>["warm","neutral","cool","brand"].includes(v)?v:null],
-  [/^brands\.(northfield|crestline)\.pairs\.(light|dark)\.(link|body|tag|tagBg|soft|softBg)$/,v=>hexOk(v)?normHex(v):null],
-  [/^brands\.(northfield|crestline)\.wordGoal$/,v=>["rule","best"].includes(v)?v:null],
-  [/^brands\.(northfield|crestline)\.onPrimary$/,v=>["auto","white","dark"].includes(v)?v:hexOk(v)?normHex(v):null],
-  [/^brands\.(northfield|crestline)\.look\.(light|dark)\.kind$/,v=>["solid","gradient"].includes(v)?v:null],
-  [/^brands\.(northfield|crestline)\.look\.(light|dark)\.to$/,v=>hexOk(v)?normHex(v):null],
-  [/^brands\.(northfield|crestline)\.look\.(light|dark)\.angle$/,v=>["down","diag","side","glow"].includes(v)?v:null],
-  [/^brands\.(northfield|crestline)\.look\.(light|dark)\.veil$/,v=>(+v>=0.5&&+v<=0.97)?+(+v).toFixed(2):null],
-  [/^brands\.(northfield|crestline)\.look\.(light|dark)\.glass$/,v=>(+v>=0.6&&+v<=1)?+(+v).toFixed(2):null],
-  [/^brands\.(northfield|crestline)\.look\.(light|dark)\.blur$/,v=>[0,4,8,16].includes(+v)?+v:null],
+  [/^brands\.([a-z][a-z0-9-]*)\.pairs\.(light|dark)\.(link|body|tag|tagBg|soft|softBg)$/,v=>hexOk(v)?normHex(v):null],
+  [/^brands\.([a-z][a-z0-9-]*)\.wordGoal$/,v=>["rule","best"].includes(v)?v:null],
+  [/^brands\.([a-z][a-z0-9-]*)\.onPrimary$/,v=>["auto","white","dark"].includes(v)?v:hexOk(v)?normHex(v):null],
+  [/^brands\.([a-z][a-z0-9-]*)\.look\.(light|dark)\.kind$/,v=>["solid","gradient"].includes(v)?v:null],
+  [/^brands\.([a-z][a-z0-9-]*)\.look\.(light|dark)\.to$/,v=>hexOk(v)?normHex(v):null],
+  [/^brands\.([a-z][a-z0-9-]*)\.look\.(light|dark)\.angle$/,v=>["down","diag","side","glow"].includes(v)?v:null],
+  [/^brands\.([a-z][a-z0-9-]*)\.look\.(light|dark)\.veil$/,v=>(+v>=0.5&&+v<=0.97)?+(+v).toFixed(2):null],
+  [/^brands\.([a-z][a-z0-9-]*)\.look\.(light|dark)\.glass$/,v=>(+v>=0.6&&+v<=1)?+(+v).toFixed(2):null],
+  [/^brands\.([a-z][a-z0-9-]*)\.look\.(light|dark)\.blur$/,v=>[0,4,8,16].includes(+v)?+v:null],
   [/^system\.(danger|success|warning)$/,v=>hexOk(v)?normHex(v):null],
   [/^type\.(heading|body|ui)$/,v=>FONTS[v]?v:null],
   [/^type\.headingStyle$/,v=>["normal","italic"].includes(v)?v:null],
@@ -823,13 +872,14 @@ const ALLOWED=[
   [/^shape\.shadow$/,v=>["none","soft","strong"].includes(v)?v:null],
   ...REG_ORDER.flatMap(id=>(REG[id].slots||[]).map(sl=>[new RegExp(`^comp\\.${id.replace(/-/g,"\\-")}\\.${sl.k}$`),v=>{const o=sl.opts.find(([x])=>String(x)===String(v));return o?o[0]:null;}]))];
 function cleanChanges(list){const out=[];(Array.isArray(list)?list:[]).slice(0,6).forEach(c=>{if(!c||typeof c.path!=="string")return;
+  const mb=c.path.match(/^brands\.([^.]+)\./);if(mb&&!Object.hasOwn(S.draft.brands,mb[1]))return;
   for(const [re,fn] of ALLOWED){if(re.test(c.path)){const v=fn(c.value);if(v!==null&&v!==getP(S.draft,c.path)) out.push({path:c.path,value:v,why:String(c.why||"").slice(0,240)});return;}}});return out;}
 
 function summaryForModel(){
   const d=S.draft, cs=checks().filter(x=>x.level!=="pass").map(x=>`- [${x.level==="block"?"MUST FIX":"tip"}] ${x.title} ${x.detail}`).join("\n")||"- none";
-  return `DRAFT DESIGN SYSTEM (2 brands, colors only differ between brands):
-${BRANDS.map(b=>`- ${b.name} (id ${b.id}): primary ${d.brands[b.id].primary}, secondary ${d.brands[b.id].secondary}, accent ${d.brands[b.id].accent}, words on primary: ${d.brands[b.id].onPrimary}, backgrounds: light page ${bgOf(d.brands[b.id],"light","page")} / light window ${bgOf(d.brands[b.id],"light","card")} / dark page ${bgOf(d.brands[b.id],"dark","page")} / dark window ${bgOf(d.brands[b.id],"dark","card")}${d.brands[b.id].palette?`\n  Official color set (in order of importance): ${d.brands[b.id].palette.groups.map(g=>`${g.name}: ${g.colors.map(c=>`${c.name} ${c.hex} (${c.share}%)`).join(", ")}`).join(" | ")}`:""}`).join("\n")}
-- Page looks: ${BRANDS.map(b=>["light","dark"].map(md=>`${b.id} ${md}: ${lookSummary(lookOf(d.brands[b.id],md))}`).join("; ")).join("; ")}
+  return `DRAFT DESIGN SYSTEM (${brands().length} brand${brands().length>1?"s":""}, colors only differ between brands, the first is the default):
+${brands().map(b=>`- ${b.name} (id ${b.id}): primary ${d.brands[b.id].primary}, secondary ${d.brands[b.id].secondary}, accent ${d.brands[b.id].accent}, words on primary: ${d.brands[b.id].onPrimary}, backgrounds: light page ${bgOf(d.brands[b.id],"light","page")} / light window ${bgOf(d.brands[b.id],"light","card")} / dark page ${bgOf(d.brands[b.id],"dark","page")} / dark window ${bgOf(d.brands[b.id],"dark","card")}${d.brands[b.id].palette?`\n  Official color set (in order of importance): ${d.brands[b.id].palette.groups.map(g=>`${g.name}: ${g.colors.map(c=>`${c.name} ${c.hex} (${c.share}%)`).join(", ")}`).join(" | ")}`:""}`).join("\n")}
+- Page looks: ${brands().map(b=>["light","dark"].map(md=>`${b.id} ${md}: ${lookSummary(lookOf(d.brands[b.id],md))}`).join("; ")).join("; ")}
 - Gray color: ${d.gray||"warm"}
 - Shared: danger ${d.system.danger}, success ${d.system.success}, warning ${d.system.warning}
 - Type: heading font ${d.type.heading} (${d.type.headingStyle}), body font ${d.type.body}, label font ${uiFont(d)}, scale ${d.type.scale}, heading weight ${d.type.headingWeight}, line height ${d.type.lineHeight}
@@ -838,12 +888,12 @@ ${BRANDS.map(b=>`- ${b.name} (id ${b.id}): primary ${d.brands[b.id].primary}, se
 - Sizes (admin-owned, not changeable by you): consumer body ${sizesFor(d,"consumer","standard").base}px (${sizesFor(d,"consumer","large").base}px in Large, the default), consumer control height ${sizesFor(d,"consumer","large").control}px; employee body ${sizesFor(d,"employee","standard").base}px, control ${sizesFor(d,"employee","standard").control}px.
 CURRENT CHECK RESULTS:
 ${cs}
-The person is looking at the "${S.sec}" section, with the ${BN[S.ui.brand]} brand selected.`;
+The person is looking at the "${S.sec}" section, with the ${bn(S.ui.brand)} brand selected.`;
 }
 const RULES=`You are the design guide inside a brand console. The people using it are a brand marketing team, not engineers. Most of the end customers are over 65, so readability and accessibility matter a lot (WCAG AA is required: 4.5:1 for text, 3:1 for outlines; aim for 7:1 for body text and links).
 You can suggest changes to the draft. Nothing is applied until the person accepts it.
 Allowed change paths and values:
-- brands.<northfield|crestline>.<primary|secondary|accent>: "#RRGGBB"
+- brands.<brand id>.<primary|secondary|accent>: "#RRGGBB"
 - brands.<id>.onPrimary: "auto" | "white" | "dark"
 - brands.<id>.pairs.<light|dark>.<link|body|tag|tagBg|soft|softBg>: "#RRGGBB" hand-picked word or background colors. Only suggest pairs that reach at least 4.5 to 1, and prefer 7 to 1.
 - brands.<id>.wordGoal: "rule" (4.5 to 1) | "best" (7 to 1, darker links, help text, tag and error words; brand colors stay the same)
@@ -867,14 +917,14 @@ function canned(text){
     const ch=[];checks().filter(x=>x.level==="block"&&x.fix).forEach(x=>fixChanges(d,x.fix).forEach(c=>{if(!ch.some(y=>y.path===c.path))ch.push(c);}));
     return ch.length?{reply:`I found ${ch.length} thing${ch.length>1?"s":""} I can fix. Each fix keeps your color family and only makes it a little deeper. Look them over before you add them.`,changes:ch}:{reply:"Every check already passes. There is nothing to fix right now.",changes:[]};}
   if(/safe for words|safe for text|which accent/.test(t)){const b=S.ui.brand,pal=d.brands[b].palette;
-    if(!pal) return {reply:`${BN[b]} does not have a full color set yet. Its main color is ${d.brands[b].primary}.`,changes:[]};
+    if(!pal) return {reply:`${bn(b)} does not have a full color set yet. Its main color is ${d.brands[b].primary}.`,changes:[]};
     const ok=pal.groups.flatMap(g=>g.colors).filter(c=>contrast(c.hex,"#FFFFFF")>=4.5).map(c=>c.name);
-    return {reply:`In the ${BN[b]} set, these colors are dark enough for words on white: ${ok.join(", ")}. The lighter colors are fine for shapes, lines, and backgrounds, but not for words.`,changes:[]};}
-  if(/green|too light|white button|white text|white words|fix the buttons/.test(t)){
-    const b=/green/.test(t)?"northfield":S.ui.brand, P=d.brands[b].primary, c=colorsFor(d,b), r=contrast(c.onP,P);
+    return {reply:`In the ${bn(b)} set, these colors are dark enough for words on white: ${ok.join(", ")}. The lighter colors are fine for shapes, lines, and backgrounds, but not for words.`,changes:[]};}
+  if(/main color|too light|white button|white text|white words|fix the buttons/.test(t)){
+    const b=S.ui.brand, P=d.brands[b].primary, c=colorsFor(d,b), r=contrast(c.onP,P);
     if(r>=4.5&&c.onP!=="#FFFFFF"&&/white/.test(t)){const sc=scaleOf(P),k=[600,700,800,900].find(k=>contrast("#FFFFFF",sc[k])>=4.5);
       if(k) return {reply:`White words on ${P} reach only ${fmt(contrast("#FFFFFF",P))} to 1, so your buttons use dark words now. If you want white words, shade ${k} of your green is dark enough. It reaches ${fmt(contrast("#FFFFFF",sc[k]))} to 1. Buttons would look the same in light and dark mode.`,changes:[{path:`brands.${b}.primary`,value:sc[k],why:`Shade ${k} of your green. White words on it are easy to read.`},{path:`brands.${b}.onPrimary`,value:"white",why:"White words on the main color."}]};}
-    if(r>=4.5) return {reply:`The ${BN[b]} buttons pass right now. The words on them reach ${fmt(r)} to 1.`,changes:[]};
+    if(r>=4.5) return {reply:`The ${bn(b)} buttons pass right now. The words on them reach ${fmt(r)} to 1.`,changes:[]};
     return {reply:`White words on ${P} reach only ${fmt(contrast("#FFFFFF",P))} to 1. The rule is 4.5 to 1. The best fix keeps your color and puts dark words on it.`,changes:[{path:`brands.${b}.onPrimary`,value:"dark",why:"Your color stays the same. Dark words on it are easy to read."}]};}
   if(/sixty|65|older|big enough|font for older|read/.test(t)){
     const ch=[];if(d.type.body!=="Atkinson Hyperlegible") ch.push({path:"type.body",value:"Atkinson Hyperlegible",why:"Letters that look alike, like I and l, are easy to tell apart."});
@@ -887,9 +937,9 @@ function canned(text){
   if(/flat|stand out/.test(t)) return {reply:"A stronger shadow lifts the cards off the page. Keep the thin line too, because some people cannot see soft shadows well.",changes:[{path:"comp.card.shadow",value:"strong",why:"Cards lift off the page a little more."}]};
   if(/dark layer|lighter|overlay/.test(t)) return {reply:"A lighter layer still shows that the page is paused. I would not go lighter than this, or people may try to click behind the pop-up.",changes:d.comp.dialog.overlay>40?[{path:"comp.dialog.overlay",value:40,why:"Lighter, but the page behind still looks paused."}]:[]};
   if(/employee|rows|more on/.test(t)) return {reply:"Employee screen sizes are set by your admin team, so I cannot change them here. I can tell you that the text is already 14 pixels, which is the smallest size we allow. Fitting more rows would mean tighter row spacing, which your admin team can decide.",changes:[]};
-  if(/warm|northfield/.test(t)){const P=d.brands.northfield.primary;let nv=shift(P,-0.03,-14);if(contrast(INK,nv)<4.5)nv=darkenTo(nv,"#FFFFFF",4.6);
-    return {reply:"I moved the Northfield green a little toward yellow. That makes it feel warmer and sunnier. It still reads as your green.",changes:[{path:"brands.northfield.primary",value:nv,why:"A warmer green that still passes with white words."}]};}
-  if(/why.*white|white.*problem/.test(t)) return {reply:`Light colors make white words hard to see. White words need a color that is dark enough behind them. The rule is 4.5 to 1. The ${BN[S.ui.brand]} main color is ${d.brands[S.ui.brand].primary}, and white words on it reach ${fmt(contrast("#FFFFFF",d.brands[S.ui.brand].primary))} to 1. Many of your customers have weaker eyesight, so this matters even more.`,changes:[]};
+  if(/warm/.test(t)){const b=S.ui.brand,P=d.brands[b].primary;let nv=shift(P,-0.03,-14);if(contrast(INK,nv)<4.5)nv=darkenTo(nv,"#FFFFFF",4.6);
+    return {reply:`I moved the ${bn(b)} main color a little toward yellow. That makes it feel warmer and sunnier. It still reads as your color.`,changes:[{path:`brands.${b}.primary`,value:nv,why:"A warmer color that still passes with white words."}]};}
+  if(/why.*white|white.*problem/.test(t)) return {reply:`Light colors make white words hard to see. White words need a color that is dark enough behind them. The rule is 4.5 to 1. The ${bn(S.ui.brand)} main color is ${d.brands[S.ui.brand].primary}, and white words on it reach ${fmt(contrast("#FFFFFF",d.brands[S.ui.brand].primary))} to 1. Many of your customers have weaker eyesight, so this matters even more.`,changes:[]};
   return {reply:"I can help with colors, fonts, corners, shadows, and how each component looks. Tell me what you want to change, and I will suggest something that passes every check.",changes:[]};
 }
 let askCtl=null;
@@ -948,7 +998,7 @@ function voiceStop(){const v=S.voice;if(!v)return;S.voice=null;
    RENDER
    ===================================================================== */
 function brandBar(){
-  return `<div class="brandbar" role="group" aria-label="Brand you are editing"><span class="bbl">Brand you are editing</span><div class="bbseg">${BRANDS.map(b=>{const on=b.id===S.ui.brand;return `<button type="button" class="${on?"on":""}" data-seg="ui.brand" data-v="${b.id}" aria-pressed="${on}"><i style="background:${S.draft.brands[b.id].primary}"></i>${esc(b.name)}</button>`;}).join("")}</div></div>`;
+  return `<div class="brandbar" role="group" aria-label="Brand you are editing"><span class="bbl">Brand you are editing</span><div class="bbseg">${brands().map(b=>{const on=b.id===S.ui.brand;return `<button type="button" class="${on?"on":""}" data-seg="ui.brand" data-v="${b.id}" aria-pressed="${on}"><i style="background:${S.draft.brands[b.id].primary}"></i>${esc(b.name)}</button>`;}).join("")}</div></div>`;
 }
 /* The offline prototype says that its changes stay in the page. Online, the top bar shows who is signed in instead. */
 function proto(){
@@ -956,7 +1006,7 @@ function proto(){
 }
 function section(){
   switch(S.sec){
-    case "color":return secColor();case "type":return secType();case "space":return secSpace();case "shape":return secShape();case "icons":return secIcons();
+    case "brands":return secBrands();case "color":return secColor();case "type":return secType();case "space":return secSpace();case "shape":return secShape();case "icons":return secIcons();
     case "library":return secLibrary();
     case "checks":return secChecks();case "publish":return secPublish();case "history":return secHistory();case "export":return secExport();case "figma":return secFigma();}
   if(REG[S.sec]) return secComp(S.sec);
@@ -965,6 +1015,7 @@ function section(){
 const LOADED_FONTS=new Set();
 function loadFonts(names){hostedFontCss();names.forEach(n=>{if(!FONTS[n])return;const key=FONTS[n].standIn||n;if(LOADED_FONTS.has(key))return;LOADED_FONTS.add(key);const l=document.createElement("link");l.rel="stylesheet";l.href=fontHref([n]);document.head.appendChild(l);});}
 function render(){
+  if(!Object.hasOwn(S.draft.brands,S.ui.brand)) S.ui.brand=brands()[0].id;
   loadFonts([S.draft.type.heading,S.draft.type.body,uiFont(S.draft),uiFont(S.published),S.published.type.heading,S.published.type.body,...(S.beforeLast?[S.beforeLast.type.heading,S.beforeLast.type.body]:[]),pvState().type.heading,pvState().type.body,...(S.sec==="type"?Object.keys(FONTS):[])]);
   const ae=document.activeElement, fid=ae&&ae.id, sel=ae&&("selectionStart" in ae)?[ae.selectionStart,ae.selectionEnd]:null;
   const sc=document.getElementById("scroller"), st=sc?sc.scrollTop:0, pb=document.getElementById("pvbody"), pst=pb?pb.scrollTop:0;
@@ -1004,7 +1055,7 @@ let TOKMAP=null;
 function tokMap(){if(TOKMAP) return TOKMAP;TOKMAP={};const st=S.draft;
   REG_ORDER.forEach(id=>{let toks=[];const R2=REG[id];
     if(R2.legacy){const h=compTokens(id);toks=[...h.matchAll(/<span class="tok">([^<]*)<\/span>/g)].map(m=>m[1]);}
-    else if(R2.tokens){try{toks=R2.tokens({st,c:colorsFor(st,"northfield"),z:sizesFor(st,"consumer","large"),cfg:st.comp[id]||{}}).map(r=>r[1]);}catch(e){}}
+    else if(R2.tokens){try{toks=R2.tokens({st,c:colorsFor(st,brandList(st)[0].id),z:sizesFor(st,"consumer","large"),cfg:st.comp[id]||{}}).map(r=>r[1]);}catch(e){}}
     (R2.slots||[]).forEach(sl=>{if(sl.type==="radius")toks.push("{radius.slot}");if(sl.type==="shadow")toks.push("{shadow.slot}");});
     TOKMAP[id]=toks.join(" ");});return TOKMAP;}
 function usersOf(needles){const m=tokMap();return REG_ORDER.filter(id=>needles.some(n=>m[id].includes(n)));}
@@ -1049,33 +1100,46 @@ function chromeIsDark(){return false;}
 /* =====================================================================
    EVENTS
    ===================================================================== */
-const EDIT_WORDS={guide:"the guide's change",fix:"the fix",undo:"the undo",figma:"the Figma sync",fontLib:"the font library"};
+const EDIT_WORDS={brands:"the brand change",guide:"the guide's change",fix:"the fix",undo:"the undo",figma:"the Figma sync",fontLib:"the font library"};
 function markBefore(path){const now=Date.now();if(now-(S.lastEditAt||0)>1500||S.lastEditPath!==path){S.beforeLast=clone(S.draft);S.lastEditLabel=EDIT_WORDS[path]||(path?labelFor(path):"");}S.lastEditAt=now;S.lastEditPath=path;}
 function setDraft(path,val,live,opts={}){
   if(!canEdit())return;
   markBefore(path);
-  const m=path.match(/^brands\.(\w+)\.(primary|secondary)$/);
+  const m=path.match(/^brands\.([^.]+)\.(primary|secondary)$/);
   if(m&&!opts.keepSeed){const br=S.draft.brands[m[1]];br.seeds={...(br.seeds||{}),[m[2]]:normHex(val)};}
-  const m2=path.match(/^brands\.(\w+)\.bg\.(light|dark)\.(page|card)$/);
+  const m2=path.match(/^brands\.([^.]+)\.bg\.(light|dark)\.(page|card)$/);
   if(m2&&!opts.keepSeed){const br=S.draft.brands[m2[1]];br.seeds={...(br.seeds||{}),[BG_KEYS[m2[2]][m2[3]]]:normHex(val)};}
   setP(S.draft,path,val);
   /* The main color changed: keep the words on it readable, and say so. */
   if(m&&m[2]==="primary"){const br=S.draft.brands[m[1]],w=wordsForNewMain(br);
-    if(w&&br.onPrimary!=="auto"){br.onPrimary=w;clearTimeout(S.wordT);S.wordT=setTimeout(()=>toast(`I changed the words on the ${BN[m[1]]} main color to ${w==="white"?"white":"dark"}, so they stay easy to read.`),live?400:0);}}
+    if(w&&br.onPrimary!=="auto"){br.onPrimary=w;clearTimeout(S.wordT);S.wordT=setTimeout(()=>toast(`I changed the words on the ${bn(m[1])} main color to ${w==="white"?"white":"dark"}, so they stay easy to read.`),live?400:0);}}
   if(path==="comp.button.bg"&&val==="action.primary"){const done=[];
-    for(const id of Object.keys(S.draft.brands)){const br=S.draft.brands[id],w=wordsForNewMain(br);if(w&&br.onPrimary!=="auto"){br.onPrimary=w;done.push(`${BN[id]} to ${w==="white"?"white":"dark"}`);}}
+    for(const id of Object.keys(S.draft.brands)){const br=S.draft.brands[id],w=wordsForNewMain(br);if(w&&br.onPrimary!=="auto"){br.onPrimary=w;done.push(`${bn(id)} to ${w==="white"?"white":"dark"}`);}}
     if(done.length){clearTimeout(S.wordT);S.wordT=setTimeout(()=>toast(`I changed the words on the main button for ${done.join(" and ")}, so they stay easy to read.`),live?400:0);}}
   if(S.preview) S.preview=null;
   S.lastReach=path;
   if(live) renderLive(); else {render();showReach(path,true);}
 }
 function palNameFree(g,name,skip){let n=String(name||"").trim().slice(0,40)||"New color",k=2;const base=n;while(g.colors.some((c,i)=>i!==skip&&slug(c.name)===slug(n))){n=`${base} ${k++}`;}return n;}
+function brandErr(e){toast(e&&e.message?e.message:"That did not work.");render();}
 const A={
+  brandAddOpen(){S.ui.brandAdd={name:"",division:"",primary:"",secondary:"",accent:""};render();const i=document.getElementById("badd-name");if(i)i.focus();},
+  brandAddClose(){S.ui.brandAdd=null;render();},
+  brandAdd(){if(!canEdit())return;const A0=S.ui.brandAdd||{};let r;
+    try{r=addBrand(S.draft,{name:A0.name,division:A0.division,primary:A0.primary,secondary:A0.secondary,accent:A0.accent});}
+    catch(e){S.ui.brandAdd={...A0,err:e.message};render();return;}
+    markBefore("brands");S.draft=r.state;S.ui.brand=r.id;S.ui.brandAdd=null;render();scheduleSave();
+    toast(`I added ${bn(r.id)}. Its colors are on the Color page, where you can add its color set.`);},
+  brandMove(e){if(!canEdit())return;try{const st=moveBrand(S.draft,e.dataset.b,+e.dataset.to);markBefore("brands");S.draft=st;render();scheduleSave();}catch(err){brandErr(err);}},
+  brandDelAsk(e){S.ui.brandDel=e.dataset.b;render();},
+  brandDelCancel(){S.ui.brandDel=null;render();},
+  brandDel(e){if(!canEdit())return;const id=e.dataset.b,name=bn(id);
+    try{const st=removeBrand(S.draft,id);markBefore("brands");S.draft=st;S.ui.brandDel=null;render();scheduleSave();toast(`I removed ${name}. Undo it on Review and publish if you need it back.`);}catch(err){brandErr(err);}},
   palStart(e){if(!canEdit())return;const b=e.dataset.b,br=S.draft.brands[b];markBefore(`brands.${b}.palette`);
-    br.palette={groups:[{id:"signature",name:"Signature colors",note:"These colors are what people should know as "+BN[b]+".",colors:[{name:"Main color",hex:br.primary,share:20},{name:"Second color",hex:br.secondary,share:12}]},
+    br.palette={groups:[{id:"signature",name:"Signature colors",note:"These colors are what people should know as "+bn(b)+".",colors:[{name:"Main color",hex:br.primary,share:20},{name:"Second color",hex:br.secondary,share:12}]},
       {id:"base",name:"Base",note:"The main background. It gives the other colors room to stand out.",colors:[{name:"White",hex:"#FFFFFF",share:20}]},
       {id:"accent",name:"Accent colors",note:"Use these in small amounts, like in charts, icons, and highlights.",colors:[{name:"Accent color",hex:br.accent,share:6}]}]};
-    S.ui.palAdd={b};render();scheduleSave();toast(`I started a color set for ${BN[b]}. Rename the colors and add more.`);},
+    S.ui.palAdd={b};render();scheduleSave();toast(`I started a color set for ${bn(b)}. Rename the colors and add more.`);},
   palOpen(e){S.ui.palAdd={b:e.dataset.b};render();},
   async figConnect(){const link=(document.getElementById("fig-link")||{}).value||"",token=(document.getElementById("fig-token")||{}).value||"";
     figSet({busy:"connect",error:null});
@@ -1169,7 +1233,7 @@ const A={
   sugg(e){ask(e.dataset.t);},
   stopAsk(){askCtl&&askCtl.abort();},
   applyProp(e){const p=S.props[e.dataset.id];if(!p||!canEdit())return;markBefore("guide");p.changes.forEach(c=>setP(S.draft,c.path,c.value));
-    p.changes.forEach(c=>{const m=c.path.match(/^brands\.(\w+)\.primary$/);if(m&&!p.changes.some(x=>x.path===`brands.${m[1]}.onPrimary`)){const br=S.draft.brands[m[1]],w=wordsForNewMain(br);if(w&&br.onPrimary!=="auto")br.onPrimary=w;}});p.state="applied";S.preview=null;render();toast("Added to your draft.");},
+    p.changes.forEach(c=>{const m=c.path.match(/^brands\.([^.]+)\.primary$/);if(m&&!p.changes.some(x=>x.path===`brands.${m[1]}.onPrimary`)){const br=S.draft.brands[m[1]],w=wordsForNewMain(br);if(w&&br.onPrimary!=="auto")br.onPrimary=w;}});p.state="applied";S.preview=null;render();toast("Added to your draft.");},
   previewProp(e){S.preview=S.preview===e.dataset.id?null:e.dataset.id;render();},
   dismissProp(e){const p=S.props[e.dataset.id];p.state="dismissed";if(S.preview===p.id)S.preview=null;render();},
   unpreview(){S.preview=null;render();},
@@ -1263,6 +1327,10 @@ document.addEventListener("input",e=>{
   if(t.dataset.padd){S.ui.palAdd=S.ui.palAdd||{};const k=t.dataset.padd;if(k==="hex"){if(hexOk(t.value)){S.ui.palAdd.hex=normHex(t.value);palInfoRefresh();const o=document.getElementById(t.type==="color"?"paladd-hex":"paladd-pick");if(o)o.value=t.type==="color"?normHex(t.value):normHex(t.value).toLowerCase();const btnAdd=document.querySelector('[data-a="palAdd"]');if(btnAdd)btnAdd.disabled=false;const n=document.getElementById("paladd-note");if(n)n.textContent="";}}else if(k==="name")S.ui.palAdd.name=t.value;return;}
   if(t.dataset.fadd){S.ui.fontAdd=S.ui.fontAdd||{};S.ui.fontAdd[t.dataset.fadd]=t.value;return;}
   if(t.dataset.figui){S.fig=S.fig||{};S.fig[t.dataset.figui]=t.value;return;}
+  if(t.dataset.badd){const A0=S.ui.brandAdd=S.ui.brandAdd||{},k=t.dataset.badd;
+    if(k==="name"||k==="division"){A0[k]=t.value;if(k==="name"){const n=document.getElementById("badd-id");if(n)n.innerHTML=brandAddIdNote();}return;}
+    const ok=hexOk(t.value);if(t.type!=="color")t.classList.toggle("bad",!!t.value&&!ok);if(!ok)return;A0[k]=normHex(t.value);
+    const o=document.getElementById(t.type==="color"?`badd-hex-${k}`:`badd-pick-${k}`);if(o)o.value=t.type==="color"?normHex(t.value):normHex(t.value).toLowerCase();return;}
 });
 document.addEventListener("change",e=>{
   const t=e.target;
@@ -1281,6 +1349,10 @@ document.addEventListener("change",e=>{
   if(t.dataset.figfiles&&t.files&&t.files.length){figReadFiles(t.files).then(files=>{S.fig.files=files;if(files.every(x=>x.coll&&x.mode))figCompareFiles();else render();}).catch(e=>figSet({error:e.message}));return;}
   if(t.dataset.figfile!==undefined){const x=S.fig.files[+t.dataset.figfile];x[t.dataset.k]=t.value||null;if(t.dataset.k==="coll"){const m=figModes(t.value);x.mode=m.length===1?m[0]:null;}if(S.fig.files.every(y=>y.coll&&y.mode))figCompareFiles();else render();return;}
   if(t.dataset.padd==="hex")return;
+  if(t.dataset.badd)return;
+  if(t.dataset.bren){if(!canEdit())return;const id=t.dataset.b,b=brandList(S.draft).find(x=>x.id===id);if(!b)return;
+    const v=t.value.trim(),patch={name:b.name,division:b.div,[t.dataset.bren]:v};if(v===(t.dataset.bren==="name"?b.name:b.div))return;
+    try{const st=renameBrand(S.draft,id,patch);markBefore(`brands.${id}.${t.dataset.bren}`);S.draft=st;render();scheduleSave();}catch(err){brandErr(err);}return;}
   if(t.dataset.palname){if(!canEdit())return;const P=t.dataset.palname,ks=P.split("."),g=getP(S.draft,ks.slice(0,-2).join(".")),i=+ks[ks.length-1];const n=palNameFree(g,t.value,i);
     if(n!==g.colors[i].name){markBefore(P+".name");g.colors[i].name=n;scheduleSave();}render();return;}
   if(t.dataset.fadd){S.ui.fontAdd=S.ui.fontAdd||{};S.ui.fontAdd[t.dataset.fadd]=t.value;if(t.type==="file")fontFilesPicked(t.files);return;}
@@ -1339,7 +1411,7 @@ function fmtDate(d){const t=new Date(d+"T12:00:00");return isNaN(t)?d:t.toLocale
 function mapHistory(v){return v.map(x=>({v:x.version,date:fmtDate(x.date),who:x.who,note:x.note,flag:!!x.flag,rb:!!x.rollbackOf}));}
 /* Who a publish is credited to. Online, the server records the signed-in person and ignores this. */
 function roleWho(){return S.me?S.me.email:"Brand team";}
-function loadState(r){S.draft=r.draft;S.published=r.published;S.history=mapHistory(r.history||[]);if("ai" in r){S.ai.server=!!r.ai;S.ai.model=r.model;}if(r.storybook)S.storybook=r.storybook;if(r.figma)S.figma=r.figma;if("shared" in r)S.shared=!!r.shared;if("github" in r)S.github=r.github;if(r.me){S.me=r.me;S.role=r.me.role;}lastSaved=JSON.stringify(S.draft);S.save="saved";}
+function loadState(r){S.draft=r.draft;S.published=r.published;if(!Object.hasOwn(S.draft.brands,S.ui.brand))S.ui.brand=brandList(S.draft)[0].id;S.history=mapHistory(r.history||[]);if("ai" in r){S.ai.server=!!r.ai;S.ai.model=r.model;}if(r.storybook)S.storybook=r.storybook;if(r.figma)S.figma=r.figma;if("shared" in r)S.shared=!!r.shared;if("github" in r)S.github=r.github;if(r.me){S.me=r.me;S.role=r.me.role;}lastSaved=JSON.stringify(S.draft);S.save="saved";}
 function mergeTurns(t){const o=[];t.forEach(x=>{if(o.length&&o[o.length-1].role===x.role)o[o.length-1].content+="\n\n"+x.content;else o.push({...x});});while(o.length&&o[0].role!=="user")o.shift();return o;}
 function parseLoose(t){if(!t)return null;try{return JSON.parse(t);}catch(e){}const f=t.match(/```(?:json)?\s*([\s\S]*?)```/);if(f){try{return JSON.parse(f[1]);}catch(e){}}const a=t.indexOf("{"),b=t.lastIndexOf("}");if(a>=0&&b>a){try{return JSON.parse(t.slice(a,b+1));}catch(e){}}return null;}
 let saveT=null,lastSaved="",savePromise=null;
