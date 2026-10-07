@@ -1,0 +1,80 @@
+# A preview of the console for each pull request, so a change can be tried on Cloudflare before it lands:
+#   https://pr-<number>-brand-console.<account>.workers.dev
+# It is a Cloudflare Workers Preview: the same Worker, with its own Durable Object storage. Its edits and its Figma
+# connection are separate from the real console's, and it cannot make proposals (PREVIEW is set). When the pull
+# request closes, the preview and everything it stored are deleted.
+# Cloudflare Access must cover *-brand-console.<account>.workers.dev; until it does, the Worker refuses everyone.
+name: Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+permissions:
+  contents: read
+  packages: read
+  pull-requests: write
+
+concurrency:
+  group: preview-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    # Only this repository has the settings to deploy. Copies and forks of it never do.
+    if: github.repository == 'heymrcarter/brand-console' && github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      REPO: ${{ vars.REPO }}
+      BRANCH: ${{ vars.BRANCH }}
+      STORYBOOK_PREVIEW_URL: ${{ vars.STORYBOOK_PREVIEW_URL }}
+      REVIEWERS: ${{ vars.REVIEWERS }}
+      GH_APP_ID: ${{ vars.GH_APP_ID }}
+      GH_APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
+      TEAM_DOMAIN: ${{ vars.TEAM_DOMAIN }}
+      POLICY_AUD: ${{ vars.POLICY_AUD }}
+      GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: "@heymrcarter"
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+      - run: npm test
+      - run: node scripts/deploy-worker.mjs --check
+      - run: npm run worker:assets
+      - name: Deploy the preview
+        id: deploy
+        run: node scripts/deploy-worker.mjs --preview "pr-${{ github.event.number }}"
+      - name: Link it on the pull request
+        if: steps.deploy.outputs.url != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr comment "${{ github.event.number }}" --edit-last --create-if-none --body "**Console preview for this pull request:** ${{ steps.deploy.outputs.url }}
+
+          It runs this pull request's code, as of ${{ github.event.pull_request.head.sha }}, with its own edits and its own Figma connection, separate from the real console. It cannot make proposals. It is deleted when the pull request closes."
+
+  cleanup:
+    if: github.repository == 'heymrcarter/brand-console' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Delete the preview, and everything it stored
+        run: npx --yes wrangler@4.148.0 preview delete --name "pr-${{ github.event.number }}" --worker-name brand-console --skip-confirmation || echo "No preview to delete."

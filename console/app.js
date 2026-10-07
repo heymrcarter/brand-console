@@ -714,7 +714,8 @@ function secProposal(){
       <div class="field"><span class="fl">This change is</span>${seg("ui.bump",bump,[["patch","A fix"],["minor","New things"],["major","A big change"]],{label:"Kind of change"})}
         <span class="hint">${bump===sug.bump?"I picked this from your edits. ":`I suggested ${KIND[sug.bump].toLowerCase()}. `}${esc(sug.why)}</span>
         <span class="hint">A fix changes values only. New things add something without taking anything away. A big change removes or renames something apps use, so apps may need work. The biggest change in a proposal decides its version.</span></div>
-      <div class="btns">${btn(P?"Add to the proposal":"Start the proposal","addChange",{p:1,dis:!!k.block||paused})}</div></div>`:"";
+      ${S.previewOf?`<div class="under">This preview cannot make proposals. Try the edits here, then make the proposal in the real console.</div>`:""}
+      <div class="btns">${btn(P?"Add to the proposal":"Start the proposal","addChange",{p:1,dis:!!k.block||paused||!!S.previewOf})}</div></div>`:"";
   return `<div class="page narrow">${head("Release","Proposal",intro)}${noticeBox()}${proposalBox()}${edits}${form}</div>`;
 }
 function secHistory(){
@@ -1045,6 +1046,7 @@ function brandBar(){
 }
 /* The offline prototype says that its changes stay in the page. Online, the top bar shows who is signed in instead. */
 function proto(){
+  if(S.previewOf&&!S.offline) return `<div class="proto"><b>Preview</b><span>This is a preview of a change to the console (${esc(S.previewOf)}). Its edits and its Figma connection are separate from the real console, and it cannot make proposals.</span></div>`;
   return S.offline?`<div class="proto"><b>Prototype</b><span>Changes stay in this page until you reload.</span></div>`:"";
 }
 function section(){
@@ -1478,7 +1480,7 @@ function fmtDate(d){const t=new Date(d+"T12:00:00");return isNaN(t)?d:t.toLocale
 function mapHistory(v){return v.map(x=>({v:x.version,date:fmtDate(x.date),note:x.note||"",url:x.url||null}));}
 /* Who a change is credited to, in the offline prototype. Online, the server records the signed-in person. */
 function roleWho(){return S.me?S.me.email:"Brand team";}
-function loadState(r){S.draft=r.draft;if(r.draftRev)S.draftRev=r.draftRev;lastSaved=JSON.stringify(r.draft);S.published=r.published;S.engine=r.engine||null;S.base=r.base||null;S.proposal=r.proposal||null;S.notice=r.notice||null;if(!Object.hasOwn(S.draft.brands,S.ui.brand))S.ui.brand=brandList(S.draft)[0].id;S.history=mapHistory(r.history||[]);if("ai" in r){S.ai.server=!!r.ai;S.ai.model=r.model;}if(r.storybook)S.storybook=r.storybook;if(r.figma)S.figma=r.figma;if("github" in r)S.github=r.github;if(r.me){S.me=r.me;S.role=r.me.role;}lastSaved=JSON.stringify(S.draft);S.save="saved";}
+function loadState(r){S.previewOf=r.preview||null;S.draft=r.draft;if(r.draftRev)S.draftRev=r.draftRev;lastSaved=JSON.stringify(r.draft);S.published=r.published;S.engine=r.engine||null;S.base=r.base||null;S.proposal=r.proposal||null;S.notice=r.notice||null;if(!Object.hasOwn(S.draft.brands,S.ui.brand))S.ui.brand=brandList(S.draft)[0].id;S.history=mapHistory(r.history||[]);if("ai" in r){S.ai.server=!!r.ai;S.ai.model=r.model;}if(r.storybook)S.storybook=r.storybook;if(r.figma)S.figma=r.figma;if("github" in r)S.github=r.github;if(r.me){S.me=r.me;S.role=r.me.role;}lastSaved=JSON.stringify(S.draft);S.save="saved";}
 function mergeTurns(t){const o=[];t.forEach(x=>{if(o.length&&o[o.length-1].role===x.role)o[o.length-1].content+="\n\n"+x.content;else o.push({...x});});while(o.length&&o[0].role!=="user")o.shift();return o;}
 function parseLoose(t){if(!t)return null;try{return JSON.parse(t);}catch(e){}const f=t.match(/```(?:json)?\s*([\s\S]*?)```/);if(f){try{return JSON.parse(f[1]);}catch(e){}}const a=t.indexOf("{"),b=t.lastIndexOf("}");if(a>=0&&b>a){try{return JSON.parse(t.slice(a,b+1));}catch(e){}}return null;}
 let saveT=null,lastSaved="",savePromise=null;

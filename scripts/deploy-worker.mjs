@@ -96,6 +96,9 @@ export async function checkSignInWall(url, fetchFn = fetch, { accessSet = true }
 
 async function main() {
   const args = process.argv.slice(2), checkOnly = args.includes("--check"), dryRun = args.includes("--dry-run");
+  // --preview pr-12: a Workers Preview for a pull request, with its own storage, instead of production.
+  const previewAt = args.indexOf("--preview"), preview = previewAt >= 0 ? String(args[previewAt + 1] || "") : "";
+  if (previewAt >= 0 && !/^pr-\d+$/.test(preview)) { console.error('--preview needs a name like "pr-12".'); process.exit(1); }
   if (!checkOnly && !dryRun && process.env.GITHUB_ACTIONS !== "true") {
     console.error("Deploys run from GitHub Actions, with the settings stored in the repository. Push to main, or run the \"Deploy Worker\" workflow from the Actions tab. See docs/cloudflare.md.");
     process.exit(1);
@@ -113,13 +116,25 @@ async function main() {
 
   // The secrets file is readable only by this user, and is deleted however the deploy ends.
   const file = path.join(process.env.RUNNER_TEMP || os.tmpdir(), `worker-secrets-${process.pid}.json`);
-  const deployArgs = ["deploy", ...Object.entries(vars).flatMap(([k, v]) => ["--var", `${k}:${v}`])];
+  if (preview) vars.PREVIEW = preview;
+  const deployArgs = [...(preview ? ["preview", "--name", preview] : ["deploy"]), ...Object.entries(vars).flatMap(([k, v]) => ["--var", `${k}:${v}`])];
   if (Object.keys(secrets).length) { fs.writeFileSync(file, JSON.stringify(secrets), { mode: 0o600 }); deployArgs.push("--secrets-file", file); }
   if (process.env.GITHUB_SHA) deployArgs.push("--message", `GitHub Actions: ${process.env.GITHUB_SHA.slice(0, 7)}`);
   if (dryRun) deployArgs.push("--dry-run");
   let out;
   try { out = await wrangler(deployArgs); } finally { fs.rmSync(file, { force: true }); }
   if (dryRun) return;
+  if (preview) {
+    // The Preview's own address, not a single deployment's.
+    const url = (out.match(new RegExp(`https://${preview}-[a-z0-9.-]+\\.workers\\.dev`, "i")) || [])[0];
+    if (!url) { console.log("Note: wrangler did not print the Preview's address."); return; }
+    if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `url=${url}\n`);
+    // A preview address Access does not cover yet is refused by the Worker itself (403), so it is safe, but nobody
+    // can use it. That is a note, not a failure.
+    try { console.log(await checkSignInWall(url, fetch, { accessSet: !!vars.TEAM_DOMAIN })); }
+    catch (e) { console.log(`Note: ${e.message} Add *-${(url.match(/^https:\/\/pr-\d+-([^/]+)/) || [])[1] || "brand-console.<account>.workers.dev"} to the Access application.`); }
+    return;
+  }
   const url = (out.match(/https:\/\/[a-z0-9.-]+\.workers\.dev/i) || [])[0];
   if (!url) { console.log("Note: wrangler did not print a workers.dev address, so the sign-in check was skipped."); return; }
   console.log(await checkSignInWall(url, fetch, { accessSet: !!vars.TEAM_DOMAIN }));

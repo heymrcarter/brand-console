@@ -34,5 +34,18 @@
   // For wrangler dev on your computer, put settings in .dev.vars, which Git ignores (see .dev.vars.example).
   "observability": {
     "enabled": true
+  },
+  // Pull request previews (Cloudflare Workers Previews: wrangler preview --name pr-<number>). Each one gets its own
+  // Durable Object storage, so its edits and Figma connection never touch the real console's. The binding must be
+  // named again here for previews to have it. Settings come from the workflow, like production's.
+  "previews": {
+    "durable_objects": {
+      "bindings": [
+        {
+          "name": "DESIGN_SYSTEM",
+          "class_name": "DesignSystem"
+        }
+      ]
+    }
   }
 }

@@ -18,7 +18,7 @@ export function createApi({ store, proposals, figma, ask, info, roleOf = () => "
     const [draft, published, history, figmaStatus] = await Promise.all([store.draft(), store.published(), proposals.releases(), figma.status()]);
     const i = info();
     const me = user ? { email: user.email, name: user.name || "", role: roleOf(user) } : null;
-    return { draft, draftRev: await store.revOf(draft), published, engine: { version: ENGINE_VERSION, behind: engineBehind(published.version) }, proposal: prop.proposal, base: prop.base, notice: prop.notice, history, ai: !!i.ai, model: i.ai ? i.model : null, storybook: i.storybook, figma: figmaStatus, github: i.github || null, me };
+    return { draft, draftRev: await store.revOf(draft), preview: i.preview || null, published, engine: { version: ENGINE_VERSION, behind: engineBehind(published.version) }, proposal: prop.proposal, base: prop.base, notice: prop.notice, history, ai: !!i.ai, model: i.ai ? i.model : null, storybook: i.storybook, figma: figmaStatus, github: i.github || null, me };
   }
   const who = (user) => (user ? { email: user.email, name: user.name || "" } : {});
   const by = (user) => (user && (user.name || user.email)) || null;
