@@ -55,14 +55,16 @@ export class DesignSystem extends DurableObject {
     // The Worker has 10 ms of CPU per request on the free plan, so the engine's results are not copied. See server/engine.mjs.
     const store = createStore(storage, { live, copyEngineResults: false });
     const github = createGitHubClient({ repo: env.GITHUB_REPO, token, apiBase });
-    const proposals = createProposals({ github, store, edits: storage, kv: createDurableKV(sql), base: branch, previewUrl: env.STORYBOOK_PREVIEW_URL || "", reviewers: String(env.REVIEWERS || "").split(",").map((x) => x.trim()).filter(Boolean), onLanded: () => { storage.refresh(); live.refresh(); } });
+    const proposals = createProposals({ github, store, edits: storage, kv: createDurableKV(sql), base: branch, previewUrl: env.STORYBOOK_PREVIEW_URL || "",
+      // A preview of a console pull request has its own edits and Figma connection, and must not open real proposals.
+      disabled: env.PREVIEW ? `This is a preview of the console (${env.PREVIEW}). It cannot make proposals. Use the real console for that.` : "", reviewers: String(env.REVIEWERS || "").split(",").map((x) => x.trim()).filter(Boolean), onLanded: () => { storage.refresh(); live.refresh(); } });
     const figma = createFigma({ storage, secrets: createDurableSecrets(sql, env), store, apiBase: env.FIGMA_API || undefined });
     const model = env.ANTHROPIC_MODEL || "claude-sonnet-5";
     const api = createApi({
       store, proposals, figma,
       live: { edits: (m) => this.room().edits(m), refresh: (m) => this.room().refresh(m) },
       ask: createAsk({ key: env.ANTHROPIC_API_KEY, model, missingKeyHelp: "Set it with: npx wrangler secret put ANTHROPIC_API_KEY" }),
-      info: () => ({ ai: !!env.ANTHROPIC_API_KEY, model, storybook: env.STORYBOOK_URL || "/storybook", github: { repo: env.GITHUB_REPO, branch } }),
+      info: () => ({ ai: !!env.ANTHROPIC_API_KEY, model, storybook: env.STORYBOOK_URL || "/storybook", github: { repo: env.GITHUB_REPO, branch }, preview: env.PREVIEW || null }),
       // Everyone is an admin for now. Later: map Microsoft Entra ID groups to "viewer", "editor", and "admin" here.
       roleOf: () => "admin",
     });

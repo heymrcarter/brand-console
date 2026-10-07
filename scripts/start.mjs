@@ -60,7 +60,7 @@ const state = fs.mkdtempSync(path.join(os.tmpdir(), "brand-console-"));
 const fake = await startFakeGitHub(path.join(root, "fixtures", "sample"), { draftPRs: process.env.DRAFT_PRS !== "0" });
 const worker = await startWranglerDev({
   root, port: consolePort, persistTo: state,
-  vars: { GITHUB_REPO: FAKE_REPO, GITHUB_TOKEN: FAKE_TOKEN, GITHUB_API: fake.url, ACCESS_LOCAL_DEV: "allow", REVIEWERS: "local-reviewer",
+  vars: { GITHUB_REPO: FAKE_REPO, GITHUB_TOKEN: FAKE_TOKEN, GITHUB_API: fake.url, ACCESS_LOCAL_DEV: "allow", REVIEWERS: "local-reviewer", ...(process.env.PREVIEW ? { PREVIEW: process.env.PREVIEW } : {}),
     // The guide uses Claude when the key is in the environment: ANTHROPIC_API_KEY=... npm start
     ...(process.env.ANTHROPIC_API_KEY ? { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY } : {}) },
 });
@@ -85,5 +85,6 @@ console.log(`
     curl -X POST ${fake.url}/_local/pulls/1/close     (withdraws it)
     curl -X POST "${fake.url}/_local/pulls/1/review?login=local-reviewer&state=APPROVED"     (approves it; or CHANGES_REQUESTED)
   To try a repository with no draft pull requests: DRAFT_PRS=0 npm start
+  To see the console the way a pull request preview runs it: PREVIEW=pr-1 npm start
 `);
 openBrowser(worker.base);

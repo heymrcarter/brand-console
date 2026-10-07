@@ -28,10 +28,12 @@ const fontFiles = (st) => Object.values((st && st.fontLib && st.fontLib.files) |
  * previewUrl: optional "https://pr-{number}-...workers.dev", where each pull request's Storybook is.
  * onLanded: called when a proposal has landed, so storages that keep main's commit for a while read it again.
  * reviewers: GitHub logins to ask for a review when a proposal is submitted. Anyone can also be asked on GitHub.
+ * disabled: a reason, when this console must not make proposals (a preview of a console pull request). It still
+ *   reads the design system and shows the open proposal, but cannot add, submit, or withdraw.
  * engineVersion: the design system version whose engine the console runs. While the live version is a newer minor
  *   or major version, no change can be added: the console updates itself on each release, in a few minutes.
  */
-export function createProposals({ github, store, edits, kv, base = "main", previewUrl = "", onLanded = () => {}, reviewers = [], engineVersion = ENGINE_VERSION, now = () => new Date() }) {
+export function createProposals({ github, store, edits, kv, base = "main", previewUrl = "", onLanded = () => {}, reviewers = [], disabled = "", engineVersion = ENGINE_VERSION, now = () => new Date() }) {
   const E = store.E;
   const states = new Map(); // commit sha -> state. A commit never changes, so neither does its state.
   let releases = null; // { at, list }: the release list, kept for a minute.
@@ -256,5 +258,6 @@ export function createProposals({ github, store, edits, kv, base = "main", previ
     if (!releases || now().getTime() - releases.at > 60000) releases = { at: now().getTime(), list: await github.releases() };
     return releases.list;
   }
-  return { status: oneAtATime(status), add: oneAtATime(add), submit: oneAtATime(submit), withdraw: oneAtATime(withdraw), dismiss: oneAtATime(dismiss), stateOfVersion, releases: releaseList };
+  const off = (fn) => (disabled ? async () => { throw plainErr(409, disabled); } : fn);
+  return { status: oneAtATime(status), add: off(oneAtATime(add)), submit: off(oneAtATime(submit)), withdraw: off(oneAtATime(withdraw)), dismiss: oneAtATime(dismiss), stateOfVersion, releases: releaseList };
 }

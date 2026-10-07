@@ -12,7 +12,7 @@ import { engineBehind, ENGINE_VERSION } from "../server/engine.mjs";
 
 const REPO = "acme/design-system", TOKEN = "test-token", MAYA = { email: "maya@example.com", name: "Maya R." };
 
-function setup({ engineVersion, reviewers, ...opts } = {}) {
+function setup({ engineVersion, reviewers, disabled, ...opts } = {}) {
   const mock = sampleRepo({ repo: REPO, token: TOKEN, ...opts });
   let clock = Date.parse("2026-10-07T10:00:00Z");
   const now = () => new Date((clock += 1000));
@@ -20,7 +20,7 @@ function setup({ engineVersion, reviewers, ...opts } = {}) {
   const storage = gh(createMemoryStorage()), live = gh(createMemoryStorage());
   const store = createStore(storage, { live });
   const github = createGitHubClient({ repo: REPO, token: TOKEN, fetch: mock.fetch });
-  const proposals = createProposals({ github, store, edits: storage, kv: createMemoryKV(), previewUrl: "https://pr-{number}-sb.example.workers.dev", now, engineVersion: engineVersion || "1.0.0", reviewers: reviewers || [] });
+  const proposals = createProposals({ github, store, edits: storage, kv: createMemoryKV(), previewUrl: "https://pr-{number}-sb.example.workers.dev", now, engineVersion: engineVersion || "1.0.0", reviewers: reviewers || [], disabled: disabled || "" });
   const edit = async (fn) => { const d = await store.draft(); fn(d); await store.saveDraft(d); };
   const changesets = (branch) => Object.keys(mock.files(branch)).filter((p) => /^\.changeset\/console-/.test(p)).map((p) => mock.text(p, branch));
   return { mock, store, proposals, edit, changesets, E: store.E };
@@ -268,4 +268,16 @@ test("if GitHub will not ask one reviewer, the others are still asked, the propo
   assert.equal(mock.pull(1).draft, false);
   assert.match(s.proposal.review.warning, /did not ask someone-else to review: Reviews may only be requested from collaborators/);
   assert.deepEqual(s.proposal.review.pending.map((p) => p.login), ["sam"], "everyone else is still asked");
+});
+
+test("a preview of a console pull request reads the design system, but cannot add, submit, or withdraw", async () => {
+  const { mock, store, proposals, edit } = setup({ disabled: "This is a preview of the console (pr-12). It cannot make proposals." });
+  await edit((d) => { d.shape.radius += 2; });
+  await assert.rejects(proposals.add({ note: "Rounder", who: MAYA }), (e) => e.status === 409 && /preview of the console \(pr-12\)/.test(e.message));
+  await assert.rejects(proposals.submit(), /cannot make proposals/);
+  await assert.rejects(proposals.withdraw(), /cannot make proposals/);
+  assert.equal(mock.pulls().length, 0);
+  assert.equal(mock.branches().filter((b) => b.startsWith("proposal/")).length, 0);
+  assert.equal((await proposals.status()).proposal, null, "it still reads");
+  assert.equal((await store.published()).version, "1.0.0");
 });
