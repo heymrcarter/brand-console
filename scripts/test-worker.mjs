@@ -77,6 +77,18 @@ try {
   r = await call("GET", "/api/state");
   check(r.json && r.json.draft.shape.radius === draft.shape.radius && r.json.draft.fontLib.files["Worker Sans"], "after a restart, the edits are still there");
 
+  // Two people's pages, both loaded on the same version of the edits, each save one change.
+  let st = (await call("GET", "/api/state")).json;
+  const pageA = JSON.parse(JSON.stringify(st.draft)), pageB = JSON.parse(JSON.stringify(st.draft));
+  pageA.type.lineHeight = 1.6; pageB.comp.button.weight = 700;
+  const sa = await call("PUT", "/api/draft", { draft: pageA, base: st.draftRev });
+  const sb = await call("PUT", "/api/draft", { draft: pageB, base: st.draftRev });
+  check(sa.status === 200 && !sa.json.merged && sb.status === 200 && sb.json.merged === true, "two pages saving on the same version: the second is combined with the first");
+  st = (await call("GET", "/api/state")).json;
+  check(st.draft.type.lineHeight === 1.6 && st.draft.comp.button.weight === 700 && st.draftRev === sb.json.rev, "both changes are in the edits, and the page gets the newest version back");
+  r = await call("PUT", "/api/draft", { draft: pageA, base: "0123456789abcdef" });
+  check(r.status === 409 && /Reload the page/.test(r.json.error), "a save on a version the server no longer knows is refused (409)");
+
   r = await call("POST", "/api/proposal/add", { note: "Rounder corners, in Worker Sans" });
   const p1 = r.json && r.json.proposal;
   check(r.status === 200 && p1 && p1.number === 1 && p1.state === "draft" && p1.changes.length === 1, `the first change opens draft pull request #1 (${r.status} ${r.json && (r.json.error || p1.branch)})`);

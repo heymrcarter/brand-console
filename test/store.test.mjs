@@ -56,3 +56,32 @@ test("bad data is refused with a 400, and fonts must be real font files", async 
   const saved = await store.saveFont({ family: "Avenir Next", weight: 700, style: "italic", fileName: "a.woff2", data: Buffer.alloc(400, 7).toString("base64") });
   assert.equal(saved.file, "fonts/avenir-next-700-italic.woff2");
 });
+
+test("two pages saving at once: each one's change is kept, and the second page gets the combined edits back", async () => {
+  const { store } = setup();
+  const loaded = await store.draft(), rev = await store.revOf(loaded);
+  const heath = JSON.parse(JSON.stringify(loaded)), suzie = JSON.parse(JSON.stringify(loaded));
+  heath.shape.radius += 2;
+  suzie.type.scale = 1.333;
+  const first = await store.saveDraft(heath, { base: rev });
+  assert.equal(first.merged, undefined, "nothing to combine: it was made on the newest edits");
+  assert.notEqual(first.rev, rev);
+  const second = await store.saveDraft(suzie, { base: rev });
+  assert.equal(second.merged, true);
+  assert.equal(second.draft.shape.radius, heath.shape.radius, "Heath's change was not overwritten");
+  assert.equal(second.draft.type.scale, 1.333, "and Suzie's is there too");
+  const now = await store.draft();
+  assert.equal(now.shape.radius, heath.shape.radius);
+  assert.equal(now.type.scale, 1.333);
+  assert.equal(second.rev, await store.revOf(now));
+});
+
+test("a save made on a version the store has forgotten is refused, and the server's own saves replace the edits", async () => {
+  const { store } = setup();
+  const d = await store.draft(); d.shape.radius += 1;
+  await assert.rejects(store.saveDraft(d, { base: "0123456789abcdef" }), (e) => e.status === 409 && /Reload the page/.test(e.message));
+  assert.equal((await store.draft()).shape.radius, d.shape.radius - 1, "nothing was saved");
+  const r = await store.saveDraft(d);
+  assert.equal(r.merged, undefined);
+  assert.equal((await store.draft()).shape.radius, d.shape.radius);
+});

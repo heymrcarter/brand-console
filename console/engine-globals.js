@@ -5,5 +5,7 @@
    index.html loads app.js with defer, so it runs after this module, in the order the page lists them.
    When app.js becomes a module that imports what it needs, this file can go. */
 import * as engine from "@heymrcarter/design-system/engine";
+// How two people's edits are combined. The server uses the same code (server/merge.mjs).
+import { mergeEdits } from "../server/merge.mjs";
 
-Object.assign(globalThis, engine);
+Object.assign(globalThis, engine, { mergeEdits });

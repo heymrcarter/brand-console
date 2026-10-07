@@ -9,6 +9,7 @@
 // This file never touches the disk itself, so the same code can run in a Cloudflare Worker with another storage.
 // Every method is async, and they run one at a time, so two saves never mix.
 import { loadEngine } from "./engine.mjs";
+import { mergeEdits } from "./merge.mjs";
 
 // copyEngineResults: false skips the engine's defensive copies (see server/engine.mjs), for the Worker. The store
 // never changes what the engine hands back, so its results are the same either way.
@@ -56,9 +57,37 @@ export function createStore(storage, { live = storage, copyEngineResults = true 
     if (!st || typeof st !== "object" || !st.brands || !st.type || !st.comp) throw err(400, "The design system data is missing parts.");
     return E.withDefaults(E.clone(st));
   }
-  async function saveDraft(st) {
+  // Versions of the edits. Each is named by a hash of its contents (its "rev"). The newest 50 are kept, so a save
+  // made on an older one can be combined with what others saved since (server/merge.mjs).
+  const revs = new Map();
+  async function revOf(st) {
+    const text = JSON.stringify(st);
+    const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)))].slice(0, 8).map((b) => b.toString(16).padStart(2, "0")).join("");
+    revs.delete(hash); revs.set(hash, text);
+    while (revs.size > 50) revs.delete(revs.keys().next().value);
+    return hash;
+  }
+  /**
+   * Saves the edits. base is the rev of the edits this save was made on. When others have saved since, only what
+   * this save changed is applied on top of theirs, and the combined edits come back as draft. Without a base (the
+   * server's own changes, like a Figma sync), the edits are replaced. A base the store no longer knows is refused
+   * (409), so nobody's work is overwritten without them knowing.
+   */
+  async function saveDraft(st, { base } = {}) {
+    clean(st); // Refuses broken data before anything else.
+    let merged = false;
+    if (base) {
+      const cur = await draft(), curRev = await revOf(cur);
+      if (base !== curRev) {
+        const was = revs.get(base);
+        if (!was) throw err(409, "Someone else changed the edits while this page was open, and the console could not combine them with yours. Reload the page to see the newest edits.");
+        st = mergeEdits(JSON.parse(was), st, cur);
+        merged = true;
+      }
+    }
     await writeTokenDir("tokens", E.stateToFiles(clean(st)));
-    return { ok: true, savedAt: new Date().toISOString() };
+    const now = await draft();
+    return { ok: true, savedAt: new Date().toISOString(), rev: await revOf(now), ...(merged ? { merged: true, draft: now } : {}) };
   }
   /**
    * Makes the edits an earlier version, keeping the edits made on top of the live one. The person then adds it
@@ -82,5 +111,5 @@ export function createStore(storage, { live = storage, copyEngineResults = true 
   let queue = Promise.resolve();
   const oneAtATime = (fn) => (...a) => { const run = queue.then(() => fn(...a)); queue = run.catch(() => {}); return run; };
   const api = { draft, published, saveDraft, restore, readTokenDir, saveFont };
-  return { E, storage, ...Object.fromEntries(Object.entries(api).map(([k, f]) => [k, oneAtATime(f)])) };
+  return { E, storage, revOf, ...Object.fromEntries(Object.entries(api).map(([k, f]) => [k, oneAtATime(f)])) };
 }

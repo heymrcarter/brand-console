@@ -16,13 +16,14 @@ export function createApi({ store, proposals, figma, ask, info, roleOf = () => "
     const [draft, published, history, figmaStatus] = await Promise.all([store.draft(), store.published(), proposals.releases(), figma.status()]);
     const i = info();
     const me = user ? { email: user.email, name: user.name || "", role: roleOf(user) } : null;
-    return { draft, published, engine: { version: ENGINE_VERSION, behind: engineBehind(published.version) }, proposal: prop.proposal, base: prop.base, notice: prop.notice, history, ai: !!i.ai, model: i.ai ? i.model : null, storybook: i.storybook, figma: figmaStatus, github: i.github || null, me };
+    return { draft, draftRev: await store.revOf(draft), published, engine: { version: ENGINE_VERSION, behind: engineBehind(published.version) }, proposal: prop.proposal, base: prop.base, notice: prop.notice, history, ai: !!i.ai, model: i.ai ? i.model : null, storybook: i.storybook, figma: figmaStatus, github: i.github || null, me };
   }
   const who = (user) => (user ? { email: user.email, name: user.name || "" } : {});
   const withRole = (b, user) => ({ ...b, role: roleOf(user) });
   const routes = {
     "GET /api/state": (b, user) => state(user),
-    "PUT /api/draft": (b) => store.saveDraft(b.draft),
+    // base: the rev of the edits the page was showing. Others' edits saved since are combined, not overwritten.
+    "PUT /api/draft": (b) => store.saveDraft(b.draft, { base: b.base }),
     // A change: the edits, with a note and a bump, become one commit on the proposal. The first opens it.
     "POST /api/proposal/add": async (b, user) => { await proposals.add({ note: b.note, bump: b.bump, who: who(user) }); return state(user); },
     "POST /api/proposal/submit": async (b, user) => { await proposals.submit(); return state(user); },

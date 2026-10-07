@@ -1163,6 +1163,7 @@ function setDraft(path,val,live,opts={}){
 function palNameFree(g,name,skip){let n=String(name||"").trim().slice(0,40)||"New color",k=2;const base=n;while(g.colors.some((c,i)=>i!==skip&&slug(c.name)===slug(n))){n=`${base} ${k++}`;}return n;}
 function brandErr(e){toast(e&&e.message?e.message:"That did not work.");render();}
 const A={
+  reloadPage(){location.reload();},
   brandAddOpen(){S.ui.brandAdd={name:"",division:"",primary:"",secondary:"",accent:""};render();const i=document.getElementById("badd-name");if(i)i.focus();},
   brandAddClose(){S.ui.brandAdd=null;render();},
   brandAdd(){if(!canEdit())return;const A0=S.ui.brandAdd||{};let r;
@@ -1466,16 +1467,24 @@ function fmtDate(d){const t=new Date(d+"T12:00:00");return isNaN(t)?d:t.toLocale
 function mapHistory(v){return v.map(x=>({v:x.version,date:fmtDate(x.date),note:x.note||"",url:x.url||null}));}
 /* Who a change is credited to, in the offline prototype. Online, the server records the signed-in person. */
 function roleWho(){return S.me?S.me.email:"Brand team";}
-function loadState(r){S.draft=r.draft;S.published=r.published;S.engine=r.engine||null;S.base=r.base||null;S.proposal=r.proposal||null;S.notice=r.notice||null;if(!Object.hasOwn(S.draft.brands,S.ui.brand))S.ui.brand=brandList(S.draft)[0].id;S.history=mapHistory(r.history||[]);if("ai" in r){S.ai.server=!!r.ai;S.ai.model=r.model;}if(r.storybook)S.storybook=r.storybook;if(r.figma)S.figma=r.figma;if("github" in r)S.github=r.github;if(r.me){S.me=r.me;S.role=r.me.role;}lastSaved=JSON.stringify(S.draft);S.save="saved";}
+function loadState(r){S.draft=r.draft;if(r.draftRev)S.draftRev=r.draftRev;lastSaved=JSON.stringify(r.draft);S.published=r.published;S.engine=r.engine||null;S.base=r.base||null;S.proposal=r.proposal||null;S.notice=r.notice||null;if(!Object.hasOwn(S.draft.brands,S.ui.brand))S.ui.brand=brandList(S.draft)[0].id;S.history=mapHistory(r.history||[]);if("ai" in r){S.ai.server=!!r.ai;S.ai.model=r.model;}if(r.storybook)S.storybook=r.storybook;if(r.figma)S.figma=r.figma;if("github" in r)S.github=r.github;if(r.me){S.me=r.me;S.role=r.me.role;}lastSaved=JSON.stringify(S.draft);S.save="saved";}
 function mergeTurns(t){const o=[];t.forEach(x=>{if(o.length&&o[o.length-1].role===x.role)o[o.length-1].content+="\n\n"+x.content;else o.push({...x});});while(o.length&&o[0].role!=="user")o.shift();return o;}
 function parseLoose(t){if(!t)return null;try{return JSON.parse(t);}catch(e){}const f=t.match(/```(?:json)?\s*([\s\S]*?)```/);if(f){try{return JSON.parse(f[1]);}catch(e){}}const a=t.indexOf("{"),b=t.lastIndexOf("}");if(a>=0&&b>a){try{return JSON.parse(t.slice(a,b+1));}catch(e){}}return null;}
 let saveT=null,lastSaved="",savePromise=null;
 function saveNote(){const el=document.getElementById("savenote");if(!el)return;
+  if(S.save==="conflict"){el.innerHTML=`${esc(S.saveErr)} <button class="btn s" data-a="reloadPage">Reload</button>`;el.style.color="var(--red)";return;}
   el.textContent=S.save==="saving"?"Saving your edits…":S.save==="error"?`Your last edit did not save. ${S.saveErr}`:"All edits are saved here.";
   el.style.color=S.save==="error"?"var(--red)":"";}
-function scheduleSave(){if(!S.draft||S.offline)return;const j=JSON.stringify(S.draft);if(j===lastSaved)return;S.save="saving";saveNote();clearTimeout(saveT);saveT=setTimeout(()=>doSave(j),500);}
-function doSave(j){savePromise=(async()=>{try{await api("PUT","/api/draft",{draft:JSON.parse(j)});lastSaved=j;S.save=JSON.stringify(S.draft)===j?"saved":"saving";}catch(e){S.save="error";S.saveErr=e.message;}saveNote();})();return savePromise;}
-async function flushSave(){if(S.offline)return;clearTimeout(saveT);const j=JSON.stringify(S.draft);if(j!==lastSaved) await doSave(j);else if(savePromise) await savePromise;if(S.save==="error") throw new Error("Your edits could not be saved, so nothing was sent. "+S.saveErr);}
+/* Each save says which version of the edits the page was showing (S.draftRev). If others saved since, the server
+   adds only this page's changes to theirs, and sends the combined edits back, so nobody's work is lost. */
+function scheduleSave(){if(!S.draft||S.offline||S.save==="conflict")return;const j=JSON.stringify(S.draft);if(j===lastSaved)return;S.save="saving";saveNote();clearTimeout(saveT);saveT=setTimeout(()=>doSave(j),500);}
+function doSave(j){savePromise=(async()=>{try{const r=await api("PUT","/api/draft",{draft:JSON.parse(j),base:S.draftRev});
+    if(r.rev)S.draftRev=r.rev;
+    if(r.merged&&r.draft){S.draft=mergeEdits(JSON.parse(j),S.draft,r.draft);lastSaved=JSON.stringify(r.draft);if(!S.mergedToast){S.mergedToast=true;toast("Someone else changed the edits too. I combined their changes with yours.");}render();}
+    else lastSaved=j;
+    S.save=JSON.stringify(S.draft)===lastSaved?"saved":"saving";if(S.save==="saving")scheduleSave();}
+  catch(e){if(e.status===409){S.save="conflict";S.saveErr=e.message;}else{S.save="error";S.saveErr=e.message;}}saveNote();})();return savePromise;}
+async function flushSave(){if(S.offline)return;clearTimeout(saveT);const j=JSON.stringify(S.draft);if(j!==lastSaved) await doSave(j);else if(savePromise) await savePromise;if(S.save==="error"||S.save==="conflict") throw new Error("Your edits could not be saved, so nothing was sent. "+S.saveErr);}
 window.addEventListener("beforeunload",e=>{if(S.draft&&JSON.stringify(S.draft)!==lastSaved){e.preventDefault();e.returnValue="";}});
 
 /* the guide's first messages: it has already looked at the draft */
