@@ -87,7 +87,8 @@ export function createStore(storage, { live = storage, copyEngineResults = true 
     }
     await writeTokenDir("tokens", E.stateToFiles(clean(st)));
     const now = await draft();
-    return { ok: true, savedAt: new Date().toISOString(), rev: await revOf(now), ...(merged ? { merged: true, draft: now } : {}) };
+    // current is for the server (the live room sends it to everyone else). The API does not send it back.
+    return { ok: true, savedAt: new Date().toISOString(), rev: await revOf(now), current: now, ...(merged ? { merged: true, draft: now } : {}) };
   }
   /**
    * Makes the edits an earlier version, keeping the edits made on top of the live one. The person then adds it

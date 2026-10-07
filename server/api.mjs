@@ -9,7 +9,9 @@
 //   Entra ID groups. The browser never decides a role: the server's role replaces any the browser sends.
 import { ENGINE_VERSION, engineBehind } from "./engine.mjs";
 
-export function createApi({ store, proposals, figma, ask, info, roleOf = () => "admin" }) {
+// live: the live room (server/live.mjs), so others see changes without reloading. Optional.
+const NO_LIVE = { edits() {}, refresh() {} };
+export function createApi({ store, proposals, figma, ask, info, roleOf = () => "admin", live = NO_LIVE }) {
   async function state(user) {
     // The proposal first: if it has just landed, the reads after it see the new main.
     const prop = await proposals.status();
@@ -19,18 +21,25 @@ export function createApi({ store, proposals, figma, ask, info, roleOf = () => "
     return { draft, draftRev: await store.revOf(draft), published, engine: { version: ENGINE_VERSION, behind: engineBehind(published.version) }, proposal: prop.proposal, base: prop.base, notice: prop.notice, history, ai: !!i.ai, model: i.ai ? i.model : null, storybook: i.storybook, figma: figmaStatus, github: i.github || null, me };
   }
   const who = (user) => (user ? { email: user.email, name: user.name || "" } : {});
+  const by = (user) => (user && (user.name || user.email)) || null;
+  // Runs a route that changes something others should see, then tells the other pages to reload the state.
+  const changes = (what, fn) => async (b, user) => { const out = await fn(b, user); live.refresh({ by: by(user), what, page: b.page }); return out; };
   const withRole = (b, user) => ({ ...b, role: roleOf(user) });
   const routes = {
     "GET /api/state": (b, user) => state(user),
     // base: the rev of the edits the page was showing. Others' edits saved since are combined, not overwritten.
-    "PUT /api/draft": (b) => store.saveDraft(b.draft, { base: b.base }),
+    "PUT /api/draft": async (b, user) => {
+      const { current, ...saved } = await store.saveDraft(b.draft, { base: b.base });
+      live.edits({ rev: saved.rev, draft: current, by: by(user), page: b.page });
+      return saved;
+    },
     // A change: the edits, with a note and a bump, become one commit on the proposal. The first opens it.
-    "POST /api/proposal/add": async (b, user) => { await proposals.add({ note: b.note, bump: b.bump, who: who(user) }); return state(user); },
-    "POST /api/proposal/submit": async (b, user) => { await proposals.submit(); return state(user); },
-    "POST /api/proposal/withdraw": async (b, user) => { await proposals.withdraw(); return state(user); },
+    "POST /api/proposal/add": changes("added a change to the proposal", async (b, user) => { await proposals.add({ note: b.note, bump: b.bump, who: who(user) }); return state(user); }),
+    "POST /api/proposal/submit": changes("submitted the proposal for review", async (b, user) => { await proposals.submit(); return state(user); }),
+    "POST /api/proposal/withdraw": changes("withdrew the proposal", async (b, user) => { await proposals.withdraw(); return state(user); }),
     "POST /api/proposal/dismiss": async (b, user) => { await proposals.dismiss(); return state(user); },
     // Makes the edits an earlier version. It reaches apps only when it is added to a proposal and lands.
-    "POST /api/rollback": async (b, user) => { await store.restore(await proposals.stateOfVersion(String(b.version || ""))); return state(user); },
+    "POST /api/rollback": changes("rolled the edits back to an earlier version", async (b, user) => { await store.restore(await proposals.stateOfVersion(String(b.version || ""))); return state(user); }),
     "POST /api/ask": async (b) => ({ text: await ask(b.turns || []) }),
     "GET /api/health": () => ({ ok: true }),
     "POST /api/fonts": (b) => store.saveFont(b),
@@ -39,10 +48,10 @@ export function createApi({ store, proposals, figma, ask, info, roleOf = () => "
     "POST /api/figma/link": (b) => figma.setLink(b),
     "POST /api/figma/disconnect": (b) => figma.disconnect(b),
     "POST /api/figma/compare": (b, user) => figma.compare(withRole(b, user)),
-    "POST /api/figma/apply": async (b, user) => ({ ...(await figma.apply(withRole(b, user))), ...(await state(user)) }),
+    "POST /api/figma/apply": changes("synced with Figma", async (b, user) => ({ ...(await figma.apply(withRole(b, user))), ...(await state(user)) })),
     "GET /api/figma/files": () => figma.exportFiles(),
     "POST /api/figma/files/compare": (b, user) => figma.compareFiles(withRole(b, user)),
-    "POST /api/figma/files/apply": async (b, user) => ({ ...(await figma.applyFiles(withRole(b, user))), ...(await state(user)) }),
+    "POST /api/figma/files/apply": changes("brought in changes from Figma files", async (b, user) => ({ ...(await figma.applyFiles(withRole(b, user))), ...(await state(user)) })),
   };
   return {
     /** True when method and path name a route. */

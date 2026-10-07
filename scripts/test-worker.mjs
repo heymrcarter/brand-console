@@ -89,7 +89,34 @@ try {
   r = await call("PUT", "/api/draft", { draft: pageA, base: "0123456789abcdef" });
   check(r.status === 409 && /Reload the page/.test(r.json.error), "a save on a version the server no longer knows is refused (409)");
 
-  r = await call("POST", "/api/proposal/add", { note: "Rounder corners, in Worker Sans" });
+  // Live: two pages connected at once see each other, and each other's saves, without reloading.
+  const wsBase = w.base.replace(/^http/, "ws") + "/api/live?page=";
+  const openLive = (page, headers = { origin: w.base }) => new Promise((ok, bad) => {
+    const ws = new WebSocket(wsBase + page, { headers });
+    const got = [];
+    ws.addEventListener("message", (e) => got.push(JSON.parse(e.data)));
+    ws.addEventListener("open", () => ok({ ws, got, wait: async (fn, ms = 4000) => { const t = Date.now(); while (Date.now() - t < ms) { const m = got.find(fn); if (m) return m; await new Promise((x) => setTimeout(x, 50)); } return null; } }));
+    ws.addEventListener("error", () => bad(new Error("did not connect")));
+  });
+  const liveA = await openLive("page-a"), liveB = await openLive("page-b");
+  const seen = await liveB.wait((m) => m.type === "presence" && m.people.length === 2);
+  check(!!seen && seen.people.every((p) => p.email === "local-dev"), "two pages connected live see each other");
+  liveA.ws.send(JSON.stringify({ type: "here", sec: "color", brand: "northfield" }));
+  check(!!(await liveB.wait((m) => m.type === "presence" && m.people.some((p) => p.page === "page-a" && p.sec === "color"))), "a page moving to Color shows up for the other");
+  st = (await call("GET", "/api/state")).json;
+  const pageEdit = JSON.parse(JSON.stringify(st.draft)); pageEdit.shape.shadow = pageEdit.shape.shadow === "strong" ? "soft" : "strong";
+  await call("PUT", "/api/draft", { draft: pageEdit, base: st.draftRev, page: "page-a" });
+  const arrived = await liveB.wait((m) => m.type === "edits");
+  check(!!arrived && arrived.draft.shape.shadow === pageEdit.shape.shadow && arrived.by === "Local development", "page A's save reaches page B within seconds, without a reload");
+  check(!liveA.got.some((m) => m.type === "edits"), "and is not sent back to page A");
+  const refused = await openLive("page-c", { origin: "https://evil.example" }).then(() => "connected", () => "refused");
+  check(refused === "refused", "a live connection from another site is refused");
+
+  r = await call("POST", "/api/proposal/add", { note: "Rounder corners, in Worker Sans", page: "page-a" });
+  check(!!(await liveB.wait((m) => m.type === "refresh" && /added a change/.test(m.what))), "adding to the proposal tells the other page to refresh");
+  liveA.ws.close(); 
+  check(!!(await liveB.wait((m) => m.type === "presence" && m.people.length === 1)), "a page that closes leaves the presence list");
+  liveB.ws.close();
   const p1 = r.json && r.json.proposal;
   check(r.status === 200 && p1 && p1.number === 1 && p1.state === "draft" && p1.changes.length === 1, `the first change opens draft pull request #1 (${r.status} ${r.json && (r.json.error || p1.branch)})`);
   check(p1 && p1.changes[0].who === "local-dev", "the change is credited to the signed-in person");

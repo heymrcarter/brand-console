@@ -3,6 +3,7 @@
 // Every request comes here first, including the console's own files (run_worker_first in wrangler.jsonc), so nothing
 // is served without a Cloudflare Access sign-in. Then:
 //   /api/*                      the console's API, run by the design system's Durable Object
+//   /api/live                   the live connection (a WebSocket) to the same Durable Object
 //   /fonts/                     uploaded font files, from GitHub and the edits
 //   anything else               the console and Storybook, as static files
 import { createAccess } from "./access.mjs";
@@ -28,6 +29,16 @@ export default {
       return json(403, { error: "Only the Brand Console can make changes here." });
     }
     const designSystem = env.DESIGN_SYSTEM.getByName(`${env.GITHUB_REPO || "unset"}#${env.GITHUB_BRANCH || "main"}`);
+
+    // The live connection: others' edits and who is here, without reloading. A WebSocket is a GET, so it gets its own
+    // address check: another site must not open one with a signed-in person's browser.
+    if (url.pathname === "/api/live") {
+      if (request.headers.get("upgrade") !== "websocket") return json(426, { error: "This address is for the console's live connection." });
+      if (request.headers.get("origin") !== url.origin) return json(403, { error: "Only the Brand Console can open a live connection." });
+      const headers = new Headers(request.headers);
+      headers.set("x-console-user", JSON.stringify({ email: user.email, name: user.name || "" }));
+      return designSystem.fetch(new Request(request, { headers }));
+    }
 
     if (isApi) {
       let body = {};

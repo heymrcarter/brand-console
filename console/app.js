@@ -125,7 +125,7 @@ function nav(){
 }
 function topbar(){
   return `<div class="top"><div style="display:flex;align-items:center;gap:12px;min-width:0"><div class="gbadge" style="width:26px;height:26px;border-radius:7px;background:conic-gradient(${brands().map((b,i)=>`${S.draft.brands[b.id].primary} ${i*100/brands().length}% ${(i+1)*100/brands().length}%`).join(",")})"></div><div class="t">Brand Console</div><div class="v hide-s">Design system for ${brands().length} brand${brands().length>1?"s":""}</div></div>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">${S.me?`<span class="who hide-s" title="Signed in as ${esc(S.me.email)}">${esc(S.me.name||S.me.email)}</span>`:""}${S.offline?"":`<a class="sblink hide-s" href="${esc(S.storybook)}" target="_blank" rel="noopener">Open Storybook</a>`}<span class="pill ok">Live: v${S.published.version}</span>${S.proposal?(S.proposal.url?`<a class="pill ${S.proposal.state==="in review"?"warn":"neutral"} hide-s" href="${esc(S.proposal.url)}" target="_blank" rel="noopener" title="${esc(reviewSummary(S.proposal)||"Open the pull request")}">${S.proposal.state==="in review"?"In review":"Draft proposal"}: #${S.proposal.number}</a>`:`<span class="pill neutral hide-s">Draft proposal</span>`):""}${changes().length?`<span class="pill warn hide-s">Draft edits</span>`:""}</div></div>`;
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">${peeps()}${S.me?`<span class="who hide-s" title="Signed in as ${esc(S.me.email)}">${esc(S.me.name||S.me.email)}</span>`:""}${S.offline?"":`<a class="sblink hide-s" href="${esc(S.storybook)}" target="_blank" rel="noopener">Open Storybook</a>`}<span class="pill ok">Live: v${S.published.version}</span>${S.proposal?(S.proposal.url?`<a class="pill ${S.proposal.state==="in review"?"warn":"neutral"} hide-s" href="${esc(S.proposal.url)}" target="_blank" rel="noopener" title="${esc(reviewSummary(S.proposal)||"Open the pull request")}">${S.proposal.state==="in review"?"In review":"Draft proposal"}: #${S.proposal.number}</a>`:`<span class="pill neutral hide-s">Draft proposal</span>`):""}${changes().length?`<span class="pill warn hide-s">Draft edits</span>`:""}</div></div>`;
 }
 
 /* =====================================================================
@@ -1065,7 +1065,7 @@ function render(){
   const pb2=document.getElementById("pvbody"); if(pb2) pb2.scrollTop=pst;
   if(S.focusAsk){S.focusAsk=false;const i=document.getElementById("askin");if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}}
   else if(fid){const el=document.getElementById(fid);if(el){el.focus({preventScroll:true});if(sel&&el.setSelectionRange){try{el.setSelectionRange(sel[0],sel[1]);}catch(e){}}}}
-  scheduleSave();saveNote();
+  scheduleSave();saveNote();liveHere();
 }
 /* light update while dragging a color or slider: preview + derived bits only */
 let rafP=null;
@@ -1446,6 +1446,7 @@ window.addEventListener("resize",(()=>{let w=window.innerWidth;return()=>{const 
    SERVER: load, autosave, proposals
    ===================================================================== */
 async function api(method,url,body,signal){
+  if(body&&typeof body==="object"&&!Array.isArray(body)) body={...body,page:S.page}; // So the live room does not send this page its own change.
   // redirect "manual": when the Cloudflare Access sign-in ends, Access answers with a redirect to its sign-in page,
   // which a request from the page cannot follow. Seeing the redirect is how the console knows to ask for a reload.
   const r=await fetch(url,{method,headers:{"content-type":"application/json"},body:body?JSON.stringify(body):undefined,signal,redirect:"manual"});
@@ -1502,10 +1503,48 @@ function greet(){
   if(!bl.length&&ch.length) addMsg({who:"g",x:"Every must-pass check passes, so you can add your edits to a proposal when you are ready."});
   addMsg({who:"g",x:"You can talk to me any time by tapping the mic."});
 }
+/* =====================================================================
+   LIVE: others' edits, and who is here, without reloading (server/live.mjs)
+   ===================================================================== */
+S.page=Math.random().toString(36).slice(2,10);S.people=[];S.liveUp=false;
+let liveWs=null,liveTry=0,livePing=null,liveSent="",liveToastAt=0;
+const SEC_NAME=id=>(NAV.flatMap(g=>g[1]).find(x=>x[0]===id)||[])[1]||(REG[id]&&REG[id].name)||id;
+function peeps(){
+  const seen=new Map();for(const p of S.people)if(p.page!==S.page&&!(S.me&&p.email===S.me.email&&p.page===S.page))seen.set(p.email+"|"+p.page,p);
+  const list=[...seen.values()];if(!list.length)return `<span class="peeps" aria-live="polite"></span>`;
+  const ini=p=>(p.name||p.email||"?").split(/[\s.@_-]+/).filter(Boolean).slice(0,2).map(w=>w[0].toUpperCase()).join("");
+  return `<span class="peeps" aria-live="polite" aria-label="Also here: ${esc(list.map(p=>p.name||p.email).join(", "))}">${list.slice(0,5).map(p=>`<span class="peep" title="${esc(p.name||p.email)}${p.sec?` · on ${esc(SEC_NAME(p.sec))}${p.brand&&S.draft.brands[p.brand]?` · ${esc(bn(p.brand))}`:""}`:""}">${esc(ini(p))}</span>`).join("")}${list.length>5?`<span class="peep">+${list.length-5}</span>`:""}</span>`;}
+function peepsRefresh(){const el=document.querySelector(".peeps");if(!el)return;const t=document.createElement("div");t.innerHTML=peeps();el.replaceWith(t.firstElementChild);}
+function liveHere(){if(!liveWs||liveWs.readyState!==1)return;const k=S.sec+"|"+S.ui.brand;if(k===liveSent)return;liveSent=k;liveWs.send(JSON.stringify({type:"here",sec:S.sec,brand:S.ui.brand}));}
+function liveSay(m){const now=Date.now();if(now-liveToastAt<2500)return;liveToastAt=now;toast(m);}
+function connectLive(){
+  if(S.offline||!("WebSocket" in window))return;
+  // A page the browser loads ahead of time, before anyone looks at it, connects only once it is shown.
+  if(document.prerendering){document.addEventListener("prerenderingchange",connectLive,{once:true});return;}
+  try{liveWs=new WebSocket(location.origin.replace(/^http/,"ws")+"/api/live?page="+S.page);}catch(e){return;}
+  liveWs.onopen=()=>{const again=liveTry>0;liveTry=0;S.liveUp=true;liveSent="";liveHere();clearInterval(livePing);livePing=setInterval(()=>{try{liveWs.send('{"type":"ping"}');}catch(e){}},30000);if(again)liveCatchUp();};
+  liveWs.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch(err){return;}
+    if(m.type==="presence"){S.people=m.people||[];peepsRefresh();}
+    else if(m.type==="edits")liveEdits(m);
+    else if(m.type==="refresh")liveRefresh(m);};
+  liveWs.onclose=()=>{S.liveUp=false;clearInterval(livePing);S.people=[];peepsRefresh();liveTry++;setTimeout(connectLive,Math.min(30000,1000*2**Math.min(liveTry,5)));};
+}
+/* Someone else saved. Their edits come in, combined with anything this page has not saved yet. */
+function liveEdits(m){
+  const before=S.draft,dirty=JSON.stringify(S.draft)!==lastSaved,base=lastSaved?JSON.parse(lastSaved):null;
+  S.draft=dirty&&base?mergeEdits(base,S.draft,m.draft):m.draft;
+  lastSaved=JSON.stringify(m.draft);S.draftRev=m.rev;
+  const ch=diff(before,S.draft);
+  if(ch.length)liveSay(`${m.by||"Someone"} changed ${labelFor(ch[0].path).replace(/^./,c=>c.toLowerCase())}${ch.length>1?`, and ${ch.length-1} more`:""}.`);
+  render();if(dirty)scheduleSave();}
+/* Something else changed: the proposal, a Figma sync, a rollback. This page loads the newest state. */
+async function liveRefresh(m){try{await flushSave();const r=await api("GET","/api/state");loadState(r);render();if(m&&m.by)liveSay(`${m.by} ${m.what||"changed something"}.`);}catch(e){}}
+/* After the connection was down: catch up on anything missed. */
+function liveCatchUp(){liveRefresh(null);}
 async function boot(){
   applyChrome();
   document.getElementById("app").innerHTML=`<div class="boot">Loading your design system…</div>`;
-  try{if(window.__EMBED__)throw new Error("offline");const r=await api("GET","/api/state");loadState(r);greet();render();}
+  try{if(window.__EMBED__)throw new Error("offline");const r=await api("GET","/api/state");loadState(r);greet();render();connectLive();}
   catch(e){
     if(e.status===401||document.getElementById("signedout")) return;
     if(window.__EMBED__){const E=window.__EMBED__;S.offline=true;S.snaps=E.snaps;loadState({draft:E.draft,published:E.published,history:E.history});greet();render();
