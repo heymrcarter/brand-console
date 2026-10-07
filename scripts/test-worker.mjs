@@ -19,7 +19,7 @@ const results = [];
 const check = (ok, what) => { const line = `${ok ? "ok  " : "FAIL"} ${what}`; results.push(line); console.log(line); if (!ok) process.exitCode = 1; };
 
 // The stand-in for GitHub, holding this project's design system files, served over HTTP for the Worker to reach.
-const fake = await startFakeGitHub(root);
+const fake = await startFakeGitHub(path.join(root, "fixtures/sample"));
 const github = fake.github, ghUrl = fake.url;
 
 execFileSync(process.execPath, [path.join(root, "scripts/build-worker-assets.mjs"), "--no-storybook"], { cwd: root, stdio: "ignore" });
@@ -37,10 +37,13 @@ try {
   let r = await call("GET", "/");
   check(r.status === 200 && /<title>Brand Console<\/title>/.test(r.text), "the console page is served");
   r = await call("GET", "/engine-globals.js");
-  check(r.status === 200 && /javascript/.test(r.type), "its engine module is served as JavaScript");
+  check(r.status === 200 && /javascript/.test(r.type) && r.text.includes("runChecks"), "the engine is served to the page, bundled from the design system package");
+  r = await call("GET", "/storybook/");
+  const stories = await call("GET", "/storybook/index.json");
+  check(r.status === 200 && /<html/i.test(r.text) && stories.status === 200 && Object.keys(stories.json.entries || {}).length > 50, `Storybook is served at /storybook/, from its package (${Object.keys((stories.json && stories.json.entries) || {}).length} entries)`);
 
   r = await call("GET", "/api/state");
-  const local = createStore(createDiskStorage(root));
+  const local = createStore(createDiskStorage(path.join(root, "fixtures/sample")));
   check(r.status === 200 && JSON.stringify(r.json.draft) === JSON.stringify(await local.draft()), "GET /api/state: the draft read from GitHub matches the project's");
   check(r.json.history.length === 3 && r.json.storybook === "/storybook" && r.json.shared === true && r.json.ai === false, "the history, the Storybook address, and no Claude key are reported");
   check(r.json.github && r.json.github.repo === REPO && r.json.github.branch === "main", "the console is told which repository and branch publishes go to, for its banner");

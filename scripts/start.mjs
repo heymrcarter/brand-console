@@ -1,12 +1,11 @@
-// Runs the Brand Console on your computer the way Cloudflare runs it, with Storybook next to it.
+// Runs the Brand Console on your computer the way Cloudflare runs it.
 //   - The real Worker, in wrangler dev (Cloudflare's workerd runtime).
-//   - A stand-in for GitHub (scripts/fake-github.mjs) holding this project's design system, so you need no GitHub
-//     account, no Cloudflare account, and no internet. Saves and publishes stay until you stop it.
-//   - Storybook, whose "Real component" preview follows your edits: the draft's theme files are copied into
-//     build/draft/ a moment after each change, and Storybook reloads from there.
-// It finds free ports on its own, prints the links, and opens the console in your browser.
+//   - A stand-in for GitHub (scripts/fake-github.mjs) holding the sample design system in fixtures/sample, so you
+//     need no GitHub account, no Cloudflare account, and no internet. Saves and publishes stay until you stop it.
+//   - Storybook at /storybook, from the @heymrcarter/design-system-storybook package, like on Cloudflare.
+// It finds a free port on its own, prints the link, and opens the console in your browser.
 // To run against a real GitHub repository instead, use npm run worker:dev with settings in .dev.vars.
-import { spawn, execFileSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -16,7 +15,6 @@ import { startFakeGitHub, FAKE_REPO, FAKE_TOKEN } from "./fake-github.mjs";
 import { startWranglerDev } from "./wrangler-dev.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const bin = (n) => path.join(root, "node_modules", ".bin", process.platform === "win32" ? n + ".cmd" : n);
 
 function canUse(port, host) {
   return new Promise((ok) => {
@@ -51,30 +49,24 @@ function openBrowser(url) {
   }
 }
 
-// 1. Build the theme files from the token files, and the console's files for the Worker.
-execFileSync(process.execPath, [path.join(root, "scripts", "build.mjs")], { stdio: "inherit", cwd: root });
-execFileSync(process.execPath, [path.join(root, "scripts", "build-worker-assets.mjs"), "--no-storybook"], { stdio: "ignore", cwd: root });
+// 1. Gather the console's files for the Worker, with the packaged Storybook.
+execFileSync(process.execPath, [path.join(root, "scripts", "build-worker-assets.mjs")], { stdio: "ignore", cwd: root });
 
-// 2. Pick ports, start the stand-in for GitHub, and the Worker.
+// 2. Pick a port, start the stand-in for GitHub, and the Worker.
 const consolePort = await freePort(Number(process.env.PORT || 5173));
-const sbPort = await freePort(6006, [consolePort]);
-const sbUrl = `http://127.0.0.1:${sbPort}`;
-if (consolePort !== 5173 || sbPort !== 6006) console.log("\n  Another program was using the usual ports, so these links use different numbers.");
+if (consolePort !== 5173) console.log("\n  Another program was using the usual port, so this link uses a different number.");
 
 const state = fs.mkdtempSync(path.join(os.tmpdir(), "brand-console-"));
-const fake = await startFakeGitHub(root, { onWrite: (msg) => console.log(`  Published to the stand-in for GitHub: ${msg.split("\n")[0]}`) });
+const fake = await startFakeGitHub(path.join(root, "fixtures", "sample"), { onWrite: (msg) => console.log(`  Published to the stand-in for GitHub: ${msg.split("\n")[0]}`) });
 const worker = await startWranglerDev({
   root, port: consolePort, persistTo: state,
-  vars: { GITHUB_REPO: FAKE_REPO, GITHUB_TOKEN: FAKE_TOKEN, GITHUB_API: fake.url, ACCESS_LOCAL_DEV: "allow", STORYBOOK_URL: sbUrl,
+  vars: { GITHUB_REPO: FAKE_REPO, GITHUB_TOKEN: FAKE_TOKEN, GITHUB_API: fake.url, ACCESS_LOCAL_DEV: "allow",
     // The guide uses Claude when the key is in the environment: ANTHROPIC_API_KEY=... npm start
     ...(process.env.ANTHROPIC_API_KEY ? { ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY } : {}) },
 });
-const kids = [];
-let stopping = false, sync = null;
+let stopping = false;
 async function stopAll(code = 0) {
   if (stopping) return; stopping = true;
-  clearInterval(sync);
-  kids.forEach((k) => { try { k.kill(); } catch { /* Already gone. */ } });
   await worker.stop(); await fake.close();
   fs.rmSync(state, { recursive: true, force: true });
   process.exit(code);
@@ -82,32 +74,10 @@ async function stopAll(code = 0) {
 process.on("SIGINT", () => stopAll(0));
 process.on("SIGTERM", () => stopAll(0));
 
-// 3. Keep build/draft/ in step with the draft, so Storybook shows each change.
-const DRAFT_FILES = ["theme.css", "settings.json", "components.manifest.json", "tokens.resolved.json"];
-sync = setInterval(async () => {
-  for (const f of DRAFT_FILES) {
-    try {
-      const r = await fetch(`${worker.base}/build/draft/${f}`);
-      if (!r.ok) continue;
-      const text = await r.text(), file = path.join(root, "build", "draft", f);
-      if (!fs.existsSync(file) || fs.readFileSync(file, "utf8") !== text) fs.writeFileSync(file, text);
-    } catch { /* The Worker is restarting, or stopping. The next round catches up. */ }
-  }
-}, 1000);
+console.log(`
+  Brand Console:  ${worker.base}
+  Storybook:      ${worker.base}/storybook/
 
-console.log(`  ┌───────────────────────────────────────────────┐`);
-console.log(`  │  Brand Console:  ${worker.base.padEnd(29)}│`);
-console.log(`  │  Storybook:      ${sbUrl.padEnd(29)}│`);
-console.log(`  │  Storybook takes about 20 seconds to start.   │`);
-console.log(`  │  Saves and publishes last until you stop.     │`);
-console.log(`  └───────────────────────────────────────────────┘\n`);
+  Saves and publishes last until you stop. To stop, press Ctrl + C.
+`);
 openBrowser(worker.base);
-
-// 4. Start Storybook. If it fails, the console keeps running.
-if (fs.existsSync(bin("storybook"))) {
-  const sb = spawn(bin("storybook"), ["dev", "-p", String(sbPort), "--host", "127.0.0.1", "--no-open", "--ci", "--quiet"], { cwd: root, stdio: ["ignore", "inherit", "inherit"], shell: process.platform === "win32" });
-  kids.push(sb);
-  sb.on("exit", (code) => { if (code && !stopping) console.log("\n  Storybook stopped because of an error. The console still works."); });
-} else {
-  console.log("\n  Storybook is not installed yet. Run npm install, then start again.");
-}

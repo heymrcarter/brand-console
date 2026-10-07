@@ -9,7 +9,7 @@ import { createStore } from "../server/store.mjs";
 import { createDiskStorage } from "../server/storage/disk.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const out = process.argv[2] || path.join(root, "brand-console-prototype.html");
-const store = createStore(createDiskStorage(root));
+const store = createStore(createDiskStorage(path.join(root, "fixtures/sample")));
 const ix = (await store.index()).versions;
 const embed = { draft: await store.draft(), published: await store.published(), history: ix, snaps: Object.fromEntries(await Promise.all(ix.map(async (v) => [v.version, await store.stateOfRelease(v.version)]))) };
 const js = (f) => fs.readFileSync(path.join(root, "console", f), "utf8");

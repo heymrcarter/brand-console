@@ -15,6 +15,8 @@ import { fakeDurableSql } from "./helpers/durable-sql.mjs";
 import { createStore } from "../server/store.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// The sample design system: three past versions and a draft.
+const sample = path.join(root, "fixtures/sample");
 const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), "dsc-storage-"));
 
 const storages = {
@@ -90,19 +92,19 @@ test("secrets in memory, for tests", async () => {
 
 // The project's tokens and releases, copied into memory.
 async function projectInMemory() {
-  const disk = createDiskStorage(root), files = {};
+  const disk = createDiskStorage(sample), files = {};
   for (const p of [...(await disk.list("tokens")), ...(await disk.list("releases"))]) files[p] = await disk.read(p);
   return createMemoryStorage(files);
 }
 
 test("the store works the same in memory as on disk, and never touches the disk", async () => {
   const memory = await projectInMemory();
-  const onDisk = createStore(createDiskStorage(root)), inMemory = createStore(memory);
+  const onDisk = createStore(createDiskStorage(sample)), inMemory = createStore(memory);
   assert.deepEqual(await inMemory.draft(), await onDisk.draft());
   assert.deepEqual(await inMemory.published(), await onDisk.published());
   assert.deepEqual(await inMemory.index(), await onDisk.index());
 
-  const diskIndex = fs.readFileSync(path.join(root, "releases/index.json"), "utf8");
+  const diskIndex = fs.readFileSync(path.join(sample, "releases/index.json"), "utf8");
   const live = (await inMemory.index()).versions[0].version;
   const d = await inMemory.draft(); d.shape.radius += 1;
   await inMemory.saveDraft(d);
@@ -113,12 +115,12 @@ test("the store works the same in memory as on disk, and never touches the disk"
   assert.equal(memory.commits.length, 1, "a publish is one commit");
   assert.match(memory.commits[0].message, new RegExp(`v${v.replace(/\./g, "\\.")}: Rounder corners`));
   for (const p of ["releases/index.json", "CHANGELOG.md", "dist/theme.css", `releases/v${v}/theme.css`]) assert.ok(memory.commits[0].files.includes(p), `${p} is in the commit`);
-  assert.equal(fs.readFileSync(path.join(root, "releases/index.json"), "utf8"), diskIndex, "the project folder did not change");
-  assert.ok(!fs.existsSync(path.join(root, `releases/v${v}`)));
+  assert.equal(fs.readFileSync(path.join(sample, "releases/index.json"), "utf8"), diskIndex, "the project folder did not change");
+  assert.ok(!fs.existsSync(path.join(sample, `releases/v${v}`)));
 });
 
 test("with copyEngineResults: false the store gives the same results and never changes the engine's own objects", async () => {
-  const engine = await import("../console/engine.js");
+  const engine = await import("@heymrcarter/design-system/engine");
   const constants = () => JSON.stringify({ BASE: engine.BASE, PALETTES: engine.PALETTES, BRANDS: engine.BRANDS, FONTS: engine.FONTS, GRAYS: engine.GRAYS });
   const before = constants();
   const run = async (copyEngineResults) => {
@@ -159,7 +161,8 @@ test("the store, the Figma sync, and the storage interface use no Node-only feat
   for (const f of ["server/store.mjs", "server/figma.mjs", "server/engine.mjs", "server/storage/storage.mjs", "server/storage/memory.mjs", "server/storage/github.mjs", "server/storage/github-app.mjs", "worker/durable-storage.mjs"]) {
     const code = fs.readFileSync(path.join(root, f), "utf8").replace(/\/\/.*$/gm, "");
     const imports = [...code.matchAll(/^\s*import\s[^;]*?from\s+["']([^"']+)["']/gm)].map((m) => m[1]);
-    assert.deepEqual(imports.filter((i) => !i.startsWith(".")), [], `${f} imports only project files`);
+    // The engine package loads without a web page or Node, and the design system repository tests that.
+    assert.deepEqual(imports.filter((i) => !i.startsWith(".") && i !== "@heymrcarter/design-system/engine"), [], `${f} imports only project files and the engine`);
     assert.ok(!/\b(process|Buffer|require|__dirname)\b/.test(code), `${f} does not use process, Buffer, require, or __dirname`);
   }
 });
@@ -245,7 +248,7 @@ test("github storage: a file that has not changed is not written again, so a dra
 });
 
 test("the store's draft save writes only the files that changed", async () => {
-  const disk = createDiskStorage(root), files = {};
+  const disk = createDiskStorage(sample), files = {};
   for (const p of [...(await disk.list("tokens")), ...(await disk.list("releases")), ...(await disk.list("build/draft"))]) files[p] = await disk.read(p);
   const mock = createGitHubMock({ repo: REPO, files });
   const memory = createMemoryStorage(); let writes = [];
@@ -345,7 +348,7 @@ test("github storage: clear errors for a bad token, a missing repository, and it
 });
 
 test("the store publishes to GitHub as one commit, within a Worker's request limit", async () => {
-  const disk = createDiskStorage(root), files = {};
+  const disk = createDiskStorage(sample), files = {};
   for (const p of [...(await disk.list("tokens")), ...(await disk.list("releases")), ...(await disk.list("dist")), ...(await disk.list("build/draft")), "CHANGELOG.md"]) files[p] = await disk.read(p);
   const { mock, storage } = github(files);
   const store = createStore(storage), onDisk = createStore(disk);
@@ -416,7 +419,7 @@ test("durable secrets: set in the console, with the Worker's own secrets as the 
 });
 
 test("the store publishes to GitHub with a Durable Object holding the pending changes", async () => {
-  const disk = createDiskStorage(root), files = {};
+  const disk = createDiskStorage(sample), files = {};
   for (const p of [...(await disk.list("tokens")), ...(await disk.list("releases"))]) files[p] = await disk.read(p);
   const mock = createGitHubMock({ repo: REPO, files });
   const sql = fakeDurableSql();

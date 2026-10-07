@@ -30,19 +30,21 @@ A GitHub App can only reach the repositories it is installed on, and its tokens 
 
 ## 2. Add the settings to the repository
 
-GitHub Actions deploys the Worker (`.github/workflows/deploy-worker.yml`), with settings stored in the repository, not in `wrangler.jsonc`. In the repository the console publishes to, go to **Settings > Secrets and variables > Actions**.
+GitHub Actions deploys the Worker from this repository, `brand-console` (`.github/workflows/deploy-worker.yml`), with settings stored here, not in `wrangler.jsonc`. In **this** repository, go to **Settings > Secrets and variables > Actions**. (The design system the console reads and publishes to is a different repository: `REPO` below.)
 
 On the **Variables** tab, add these. GitHub does not allow names that start with `GITHUB_`, so they are shorter than the Worker's own names:
 
 | Variable | What to put | The Worker sees it as |
 |---|---|---|
-| `REPO` | This repository, like `acme/design-system`. Only this repository deploys. | `GITHUB_REPO` |
+| `REPO` | The repository the console reads the design system from and publishes to, like `acme/design-system`. | `GITHUB_REPO` |
 | `BRANCH` | The branch the console reads and publishes to. Usually `main`. | `GITHUB_BRANCH` |
 | `GH_APP_ID` | The App ID from step 1 | `GITHUB_APP_ID` |
 | `GH_APP_INSTALLATION_ID` | The installation ID from step 1 | `GITHUB_APP_INSTALLATION_ID` |
 | `TEAM_DOMAIN` | Leave it out for now. Step 5 adds it. | `TEAM_DOMAIN` |
 | `POLICY_AUD` | Leave it out for now. Step 5 adds it. | `POLICY_AUD` |
 | `CLOUDFLARE_ACCOUNT_ID` | Your Cloudflare account ID, from the dashboard's **Account home** | |
+
+**Let this repository install the design system packages.** They are private. On GitHub, open each package, `@heymrcarter/design-system` and `@heymrcarter/design-system-storybook` (your profile > **Packages**), then **Package settings > Manage Actions access > Add repository**, and add `brand-console` with **Read**. The workflow then installs them with its own token.
 
 ## 3. Add the secrets
 
@@ -64,7 +66,7 @@ Push to `main`, or open the **Actions** tab, pick **Deploy Worker**, and click *
 
 The first run prints the Worker's address, like `https://brand-console.your-account.workers.dev`. Opening it shows "This console is not set up for sign-in yet." That is expected: step 5 turns sign-in on.
 
-Every push to `main` deploys again, including the commits the console makes when someone publishes. That also rebuilds Storybook, so it shows what was just published.
+Every push to `main` deploys again. Only `heymrcarter/brand-console` deploys; copies and forks of it never do. Changes to the console never release a design system version: Storybook and the engine come from the `@heymrcarter/design-system` packages, at the version in `package.json`.
 
 **Do not deploy from your computer.** `wrangler.jsonc` has no settings in it on purpose, so `npx wrangler deploy` would ship a Worker that refuses every request until Actions deploys again. `npm run worker:deploy` stops and says so. To check a change first, run `node scripts/deploy-worker.mjs --dry-run` with the settings in your shell.
 
@@ -99,7 +101,7 @@ The free plan gives a Worker 10 ms of CPU time per request, and allows 100,000 r
 
 This is for trying changes. It never deploys.
 
-`npm start` runs the real Worker in `wrangler dev` against a stand-in for GitHub that holds this project's design system, with Storybook next to it. It needs no accounts and no settings, and everything you do disappears when you stop it.
+`npm start` runs the real Worker in `wrangler dev` against a stand-in for GitHub that holds the sample design system in `fixtures/sample/`, with the packaged Storybook at `/storybook/`. It needs no accounts and no settings beyond a token to install the packages, and everything you do disappears when you stop it.
 
 To run against a real GitHub repository instead:
 
@@ -114,7 +116,7 @@ To test the Worker without GitHub or Cloudflare, run `npm run test:worker`. It s
 
 ## Good to know
 
-- **Storybook shows the draft from the last deploy.** On Cloudflare it is a built copy, not the live Storybook from your computer, so the console's "Real component" preview does not follow each change. Deploy again to update it. The console's own preview always follows each change.
+- **Storybook shows the design system version the console uses.** It comes from the `@heymrcarter/design-system-storybook` package, so the console's "Real component" preview does not follow each change. The console's own preview always does.
 - **If two people publish at the same moment,** the Durable Object runs one publish after the other. If someone pushes to the branch while a publish runs, the console builds its commit again on top of theirs.
 - **If someone edits the same file on GitHub** while the console has an unpublished change to it, the console's version wins when it publishes.
 - **Rolling back** is a new commit, like on your computer. Nothing is ever lost from the history.

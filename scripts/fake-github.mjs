@@ -1,4 +1,4 @@
-// A stand-in for GitHub, served over HTTP on this computer, holding this project's design system files.
+// A stand-in for GitHub, served over HTTP on this computer, holding a design system from a folder (the sample in fixtures/sample).
 // npm start runs the console against it, and npm run test:worker tests against it, so neither needs a GitHub
 // account or the internet. Everything it holds is lost when it stops.
 import http from "node:http";
@@ -8,9 +8,9 @@ import { createDiskStorage } from "../server/storage/disk.mjs";
 export const FAKE_REPO = "local/design-system";
 export const FAKE_TOKEN = "local-token";
 
-/** Starts the stand-in on a free port. Resolves with { url, github, close }, where github is the mock itself. */
-export async function startFakeGitHub(root, { onWrite } = {}) {
-  const disk = createDiskStorage(root), files = {};
+/** Starts the stand-in on a free port, holding the design system in dir. Resolves with { url, github, close }. */
+export async function startFakeGitHub(dir, { onWrite } = {}) {
+  const disk = createDiskStorage(dir), files = {};
   for (const p of [...await disk.list("tokens"), ...await disk.list("releases"), ...await disk.list("dist"), ...await disk.list("build/draft"), ...await disk.list("fonts")]) files[p] = await disk.readBytes(p);
   const changelog = await disk.readBytes("CHANGELOG.md");
   if (changelog) files["CHANGELOG.md"] = changelog;

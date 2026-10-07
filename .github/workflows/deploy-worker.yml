@@ -1,7 +1,7 @@
 # Tests the console, then deploys it to Cloudflare Workers. See docs/cloudflare.md.
 # Settings come from this repository's Actions variables and secrets, never from wrangler.jsonc.
-# Every push to main deploys, including the commits the console makes when someone publishes. That rebuilds
-# Storybook too, so it shows the design system as it was just published.
+# Every push to main deploys. Changes to the console never release a design system version: the design system
+# comes from the @heymrcarter/design-system packages, at the version in package.json.
 name: Deploy Worker
 
 on:
@@ -9,8 +9,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# packages: read lets npm ci install the private @heymrcarter/design-system packages. The packages' settings
+# must give this repository access (Package settings > Manage Actions access).
 permissions:
   contents: read
+  packages: read
 
 # One deploy at a time. A newer push waits for the one running, instead of stopping it halfway.
 concurrency:
@@ -28,7 +31,11 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: "@heymrcarter"
       - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
       - run: npm test
       # The real Worker in wrangler dev, against a stand-in for GitHub. It needs no Cloudflare account.
       - run: npm run test:worker
@@ -36,8 +43,8 @@ jobs:
 
   deploy:
     needs: test
-    # Only the repository the console publishes to deploys it. Copies and forks of it never do.
-    if: github.repository == vars.REPO
+    # Only this repository deploys the console. Copies and forks of it never do.
+    if: github.repository == 'heymrcarter/brand-console'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -57,7 +64,11 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: "@heymrcarter"
       - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
       # Checks the settings before the long build, so a mistake fails in seconds with a clear message.
       - run: node scripts/deploy-worker.mjs --check
       - run: npm run worker:assets

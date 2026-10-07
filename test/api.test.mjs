@@ -11,9 +11,11 @@ import { createDiskStorage } from "../server/storage/disk.mjs";
 import { createMemoryStorage, createMemorySecrets } from "../server/storage/memory.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// The sample design system: three past versions and a draft. Tests and npm start use it.
+const sample = path.join(root, "fixtures/sample");
 
 async function setup(credit) {
-  const disk = createDiskStorage(root), files = {};
+  const disk = createDiskStorage(sample), files = {};
   for (const p of [...(await disk.list("tokens")), ...(await disk.list("releases"))]) files[p] = await disk.read(p);
   const storage = createMemoryStorage(files), store = createStore(storage);
   const figma = createFigma({ storage, secrets: createMemorySecrets(), store });

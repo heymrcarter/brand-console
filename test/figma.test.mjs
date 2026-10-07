@@ -17,7 +17,7 @@ const KEY = "ABCDEFGHIJ1234", LINK = `https://www.figma.com/design/${KEY}/Brand-
 
 before(async () => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), "bc-figma-"));
-  for (const d of ["console", "tokens", "releases"]) fs.cpSync(path.join(here, d), path.join(root, d), { recursive: true });
+  for (const d of ["tokens", "releases"]) fs.cpSync(path.join(here, "fixtures/sample", d), path.join(root, d), { recursive: true });
   mock = await startFigmaMock({ fileKey: KEY });
   // The team's existing library: a Brand colors collection with a different Northfield main color, plus styles.
   const c = mock.addCollection("Brand colors", ["Northfield", "Crestline"]);

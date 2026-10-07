@@ -2,85 +2,32 @@
   "name": "brand-console",
   "version": "1.0.0",
   "private": true,
-  "description": "Design system console for Northfield and Crestline: W3C design tokens, a React component library, Storybook, and a console the brand team uses to edit and publish.",
+  "description": "The Brand Console: where the brand team edits the design system (@heymrcarter/design-system), checks it, and publishes. Runs on Cloudflare Workers.",
   "type": "module",
   "engines": {
     "node": ">=22.12.0"
   },
-  "types": "./src/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./src/index.d.ts",
-      "default": "./src/index.js"
-    },
-    "./theme.css": "./dist/theme.css",
-    "./settings.json": "./dist/settings.json",
-    "./tokens.resolved.json": "./dist/tokens.resolved.json",
-    "./package.json": "./package.json"
-  },
-  "imports": {
-    "#settings": "./dist/settings.json"
-  },
-  "files": [
-    "src",
-    "dist",
-    "docs",
-    "README.md"
-  ],
   "scripts": {
     "start": "node scripts/start.mjs",
     "worker:assets": "node scripts/build-worker-assets.mjs",
-    "worker:dev": "node scripts/build-worker-assets.mjs --no-storybook && wrangler dev",
+    "worker:dev": "node scripts/build-worker-assets.mjs && wrangler dev",
     "worker:deploy": "node scripts/deploy-worker.mjs",
-    "storybook": "storybook dev -p 6006",
-    "build": "node scripts/build.mjs",
-    "export:tokens": "node scripts/export-tokens.mjs",
-    "build-storybook": "node scripts/build.mjs && storybook build -o storybook-static",
-    "docs:build": "npm run build-storybook",
-    "test": "node --test \"test/*.test.mjs\" && vitest run",
-    "test:node": "node --test \"test/*.test.mjs\"",
-    "test:components": "vitest run",
+    "test": "node --test \"test/*.test.mjs\"",
     "test:worker": "node scripts/test-worker.mjs",
-    "check:types": "node scripts/build.mjs && tsc -p test/types",
-    "check:tokens": "node scripts/check-tokens.mjs",
     "reset-sample-data": "node scripts/seed.mjs",
     "audit": "node scripts/audit-contrast.mjs",
     "check:colors": "node scripts/consistency-audit.mjs",
     "stress": "node scripts/stress-audit.mjs 16",
     "sweep": "node scripts/bug-sweep.mjs",
-    "audit:storybook": "node scripts/storybook-audit.mjs",
-    "check:all": "npm test && npm run check:types && npm run check:tokens && npm run audit && npm run check:colors && npm run stress && npm run sweep && npm run audit:storybook",
-    "icons": "node scripts/build-icons.mjs"
+    "check:all": "npm test && npm run test:worker && npm run audit && npm run check:colors && npm run stress && npm run sweep"
   },
   "dependencies": {
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "jose": "^6.2.12",
-    "lucide-react": "^1.48.0",
-    "radix-ui": "^1.6.7",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "tailwind-merge": "^3.7.0"
+    "@heymrcarter/design-system": "0.1.0",
+    "@heymrcarter/design-system-storybook": "0.1.0",
+    "jose": "^6.2.12"
   },
   "devDependencies": {
-    "@storybook/addon-a11y": "^10.6.1",
-    "@storybook/addon-docs": "^10.6.1",
-    "@storybook/react-vite": "^10.6.1",
-    "@tailwindcss/vite": "^4.3.3",
-    "@testing-library/dom": "^10.4.2",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.3",
-    "@testing-library/user-event": "^14.6.7",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.1.1",
-    "axe-core": "^4.14.0",
-    "jsdom": "^28.1.0",
-    "storybook": "^10.6.1",
-    "tailwindcss": "^4.3.3",
-    "typescript": "^7.0.2",
     "vite": "^8.3.1",
-    "vitest": "^5.0.3",
     "wrangler": "^4.147.0"
   }
 }

@@ -12,7 +12,7 @@ import { createStore } from "../server/store.mjs";
 import { createDiskStorage } from "../server/storage/disk.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const E = loadEngine(root), store = createStore(createDiskStorage(root));
+const E = loadEngine(root), store = createStore(createDiskStorage(path.join(root, "fixtures/sample")));
 const draft = await store.draft(), published = await store.published();
 const problems = [];
 const bad = (where, what) => problems.push(`${where}: ${what}`);
@@ -21,8 +21,8 @@ const hexOk = (x) => /^#[0-9A-F]{6}$/.test(H(x));
 
 // 1. Token files: every color's hex matches its numbers, and files load back to the same draft.
 function walk(o, p, f) { if (o && typeof o === "object") { if (o.$value && o.$value.colorSpace) f(p, o.$value); for (const k in o) if (!k.startsWith("$")) walk(o[k], p ? p + "." + k : k, f); } }
-for (const f of fs.readdirSync(path.join(root, "tokens"), { recursive: true }).filter((x) => String(x).endsWith(".json"))) {
-  const doc = JSON.parse(fs.readFileSync(path.join(root, "tokens", f), "utf8"));
+for (const f of fs.readdirSync(path.join(root, "fixtures/sample/tokens"), { recursive: true }).filter((x) => String(x).endsWith(".json"))) {
+  const doc = JSON.parse(fs.readFileSync(path.join(root, "fixtures/sample/tokens", f), "utf8"));
   walk(doc, "", (p, v) => {
     const fromNums = "#" + v.components.map((c) => Math.round(c * 255).toString(16).padStart(2, "0")).join("").toUpperCase();
     if (!hexOk(v.hex)) bad(`tokens/${f} ${p}`, `hex "${v.hex}" is not a 6-digit color`);
@@ -36,7 +36,7 @@ for (const k of new Set([...Object.keys(fa), ...Object.keys(fb)])) if (k !== "ve
 
 // 2. theme.css on disk matches the engine for the draft and the live version.
 for (const [label, st, file] of [["Draft", draft, "build/draft/theme.css"], ["Live", published, "dist/theme.css"]]) {
-  const css = fs.readFileSync(path.join(root, file), "utf8");
+  const css = fs.readFileSync(path.join(root, "fixtures/sample", file), "utf8");
   const want = E.themeCss(st, st.version || "draft").replace(/^\/\* Generated.*\n/, "");
   if (css.replace(/^\/\* Generated.*\n/, "") !== want) bad(file, `${label} theme.css is out of date. Run npm run build.`);
 }
