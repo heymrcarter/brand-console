@@ -259,12 +259,13 @@ test("submitting asks the usual reviewers, and the console shows whose approval 
   assert.equal(s.proposal.review.people.find((p) => p.login === "lee").state, "approved", "a newer answer replaces an older one");
 });
 
-test("if GitHub will not ask a reviewer, the proposal is still submitted, and the console says why", async () => {
-  const { mock, proposals, edit } = setup({ reviewers: ["someone-else"], collaborators: ["sam"] });
+test("if GitHub will not ask one reviewer, the others are still asked, the proposal is still submitted, and the console says why", async () => {
+  const { mock, proposals, edit } = setup({ reviewers: ["sam", "someone-else"], collaborators: ["sam"] });
   await edit((d) => { d.shape.radius += 2; });
   await proposals.add({ note: "Rounder corners", who: MAYA });
   const s = await proposals.submit();
   assert.equal(s.proposal.state, "in review");
   assert.equal(mock.pull(1).draft, false);
   assert.match(s.proposal.review.warning, /did not ask someone-else to review: Reviews may only be requested from collaborators/);
+  assert.deepEqual(s.proposal.review.pending.map((p) => p.login), ["sam"], "everyone else is still asked");
 });

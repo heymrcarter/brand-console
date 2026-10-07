@@ -224,10 +224,13 @@ export function createProposals({ github, store, edits, kv, base = "main", previ
     rec.submitted = true;
     // Ask the usual reviewers. If GitHub will not ask someone, like a login with no access to the repository, the
     // proposal is still submitted, and the console says who could not be asked.
-    if (reviewers.length) {
-      try { await github.requestReviewers(rec.number, reviewers); rec.reviewWarning = null; }
-      catch (e) { rec.reviewWarning = `GitHub did not ask ${reviewers.join(", ")} to review: ${(e.github && e.github.message) || e.message}. Ask them on the pull request, and check that they can see the repository.`; }
+    // One at a time, so one person GitHub will not ask (like an invitation not yet accepted) does not stop the rest.
+    const missed = [];
+    for (const login of reviewers) {
+      try { await github.requestReviewers(rec.number, [login]); }
+      catch (e) { missed.push({ login, why: (e.github && e.github.message) || e.message }); }
     }
+    rec.reviewWarning = missed.length ? `GitHub did not ask ${missed.map((m) => m.login).join(", ")} to review: ${missed[0].why} Ask them on the pull request once they can see the repository.` : null;
     await keep("proposal", rec);
     return status();
   }
