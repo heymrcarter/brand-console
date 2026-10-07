@@ -23,8 +23,11 @@ export function createStore(storage, { copyEngineResults = true } = {}) {
     const values = await Promise.all(keys.map(readJson));
     return Object.fromEntries(keys.map((k, i) => ["tokens/" + k.slice(skip), values[i]]));
   }
+  // A token file the state no longer has, like a removed brand's, is deleted. The engine reads every brand file it finds.
   async function writeTokenDir(dir, files) {
-    await Promise.all(Object.entries(files).filter(([k]) => k.startsWith("tokens/")).map(([k, v]) => writeFile(`${dir}/${k.slice(7)}`, v)));
+    const keep = new Set(Object.keys(files).filter((k) => k.startsWith("tokens/")).map((k) => `${dir}/${k.slice(7)}`));
+    const gone = (await storage.list(`${dir}/brands`)).filter((p) => p.endsWith(".json") && !keep.has(p));
+    await Promise.all([...[...keep].map((p) => writeFile(p, files["tokens/" + p.slice(dir.length + 1)])), ...gone.map((p) => storage.remove(p))]);
   }
   // f: outputs already made for this state and version, so a publish makes them once for both folders.
   async function writeOutputs(dir, st, version, f = E.files(st, version)) {
@@ -110,7 +113,8 @@ export function createStore(storage, { copyEngineResults = true } = {}) {
     if (blocking.length) throw err(409, `${blocking.length} check${blocking.length > 1 ? "s" : ""} must be fixed first: ${blocking.map((b) => b.title).join(" ")}`);
     if (l && E.diff(await published(), d).length === 0) throw err(409, "Your draft has no changes to publish.");
     if (bump !== undefined && !["patch", "minor", "major"].includes(bump)) throw err(400, 'The version bump must be "patch", "minor", or "major".');
-    const v = l ? E.nextVer(l.version, bump || "minor") : "1.0.0";
+    // Without a bump, the one the changes call for: removing a brand is major, adding one is minor.
+    const v = l ? E.nextVer(l.version, bump || E.bumpFor(await published(), d).bump) : "1.0.0";
     await release(d, v, { note, who });
     return v;
   }

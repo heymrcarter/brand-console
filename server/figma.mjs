@@ -172,19 +172,20 @@ export function createFigma({ storage, secrets, store, apiBase }) {
 
   // Sync with files when the plan does not allow the variables API.
   async function exportFiles() { return { files: E.figFiles(await store.draft()) }; }
-  function readFiles(files) {
+  // The draft's brands give the modes a file name can match, like "Crestline dark".
+  function readFiles(files, st) {
     return (files || []).map((f) => { let json; try { json = typeof f.json === "object" ? f.json : JSON.parse(f.text || "{}"); } catch { throw plainErr(400, `${f.name} is not a token file. Pick the .json files you exported from Figma.`); }
-      const g = E.figGuessFile(f.name, json); return { name: f.name, json, coll: f.coll || g.coll, mode: f.mode || g.mode }; });
+      const g = E.figGuessFile(f.name, json, st); return { name: f.name, json, coll: f.coll || g.coll, mode: f.mode || g.mode }; });
   }
   async function compareFiles({ files, role } = {}) {
-    const list = readFiles(files), st = await store.draft();
+    const st = await store.draft(), list = readFiles(files, st);
     const vars = E.figFromFiles(list);
     const seen = new Set(list.filter((f) => f.coll).map((f) => f.coll));
     const rows = E.figCompare(st, vars, await base(), { role }).filter((r) => seen.has(r.coll) && (r.f !== undefined || r.status === "deleted"));
     return { rows, summary: E.figSummary(rows), files: list.map(({ name, coll, mode }) => ({ name, coll, mode })) };
   }
   async function applyFiles({ files, picks: rawPicks = {}, role } = {}) {
-    const list = readFiles(files), draft = await store.draft(), vars = E.figFromFiles(list);
+    const draft = await store.draft(), list = readFiles(files, draft), vars = E.figFromFiles(list);
     const seen = new Set(list.filter((f) => f.coll).map((f) => f.coll));
     const rows = E.figCompare(draft, vars, await base(), { role }).filter((r) => seen.has(r.coll) && (r.f !== undefined || r.status === "deleted"));
     const picks = E.figCleanPicks(rows, rawPicks);

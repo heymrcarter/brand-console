@@ -226,8 +226,8 @@ test("when the plan blocks variables, files work instead", async () => {
   mock.plan = "enterprise";
 });
 
-test("file names and Figma's color formats are understood", () => {
-  assert.deepEqual(E.figGuessFile("Theme colors - Crestline dark.tokens.json", {}), { coll: "theme", mode: "Crestline dark" });
+test("file names and Figma's color formats are understood", async () => {
+  assert.deepEqual(E.figGuessFile("Theme colors - Crestline dark.tokens.json", {}, await store.draft()), { coll: "theme", mode: "Crestline dark" });
   assert.deepEqual(E.figGuessFile("Foundations.json", {}), { coll: "found", mode: "Value" });
   const v = E.figFromFiles([{ name: "x", coll: "brand", mode: "Northfield", json: { "Main color": { $type: "color", $value: { colorSpace: "srgb", components: [1, 0.5, 0], alpha: 1 } } } }]);
   assert.equal(v.vals["brand::Main color@@Northfield"], "#FF8000");

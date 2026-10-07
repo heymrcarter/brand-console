@@ -22,18 +22,18 @@ test("publish, block, fix, publish, roll back, and flag all work on disk", async
   await store.saveDraft(base);
   await assert.rejects(store.publish({ note: "x" }), /no changes/);
 
-  const d = await store.draft(); d.brands.northfield.primary = "#88BC40"; d.brands.northfield.onPrimary = "white";
+  const d = await store.draft(); d.brands.brand.primary = "#88BC40"; d.brands.brand.onPrimary = "white";
   await store.saveDraft(d);
   await assert.rejects(store.publish({ note: "x" }), /must be fixed/);
 
-  const d2 = await store.draft(); d2.brands.northfield.onPrimary = "dark"; await store.saveDraft(d2);
-  assert.equal(await store.publish({ note: "New green.", who: "Test" }), "1.1.0");
-  assert.equal((await store.published()).brands.northfield.primary, "#88BC40");
+  const d2 = await store.draft(); d2.brands.brand.onPrimary = "dark"; await store.saveDraft(d2);
+  assert.equal(await store.publish({ note: "New green.", who: "Test", bump: "minor" }), "1.1.0");
+  assert.equal((await store.published()).brands.brand.primary, "#88BC40");
   assert.ok(fs.readFileSync(path.join(tmp, "dist/theme.css"), "utf8").includes("1.1.0"));
 
   const d3 = await store.draft(); d3.type.body = "Lexend"; await store.saveDraft(d3);
   assert.equal(await store.rollback({ version: "1.0.0", who: "Test" }), "1.2.0");
-  assert.equal((await store.published()).brands.northfield.primary, base.brands.northfield.primary);
+  assert.equal((await store.published()).brands.brand.primary, base.brands.brand.primary);
   assert.equal((await store.draft()).type.body, "Lexend", "unpublished changes stay in the draft");
 
   assert.equal(await store.flag("1.1.0"), true);
@@ -71,5 +71,23 @@ test("publishing makes a Git commit when the project uses Git, even with no font
   assert.ok(!fs.existsSync(path.join(tmp, "fonts")), "this project has no uploaded fonts");
   assert.match(git("log", "--format=%s"), /Publish design system v1\.0\.0/);
   assert.equal(git("status", "--porcelain", "tokens", "releases", "dist", "CHANGELOG.md"), "", "everything the publish wrote is committed");
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+test("a brand added, removed, and published keeps the token files in step, so a removed brand does not come back", async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "dsc-"));
+  for (const d of ["tokens", "releases"]) fs.cpSync(path.join(root, "fixtures/sample", d), path.join(tmp, d), { recursive: true });
+  const store = createStore(createDiskStorage(tmp));
+  const { state, id } = E.addBrand(await store.draft(), { name: "Harbor", primary: "#0B4F6C", secondary: "#20A39E", accent: "#FFBA49" });
+  await store.saveDraft(state);
+  assert.ok(fs.existsSync(path.join(tmp, `tokens/brands/${id}.tokens.json`)));
+  assert.deepEqual(E.brandList(await store.draft()).map((b) => b.id), ["northfield", "crestline", "harbor"]);
+  await store.saveDraft(E.removeBrand(await store.draft(), "crestline"));
+  assert.ok(!fs.existsSync(path.join(tmp, "tokens/brands/crestline.tokens.json")), "its file is gone");
+  assert.deepEqual(E.brandList(await store.draft()).map((b) => b.id), ["northfield", "harbor"], "and it stays gone");
+  const v = await store.publish({ note: "Harbor in, Crestline out.", who: "Test" });
+  assert.equal(v, "2.0.0", "removing a brand is a major version");
+  assert.deepEqual(fs.readdirSync(path.join(tmp, `releases/v${v}/tokens/brands`)).sort(), ["harbor.tokens.json", "northfield.tokens.json"]);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(tmp, "dist/settings.json"), "utf8")).brands, ["northfield", "harbor"]);
   fs.rmSync(tmp, { recursive: true, force: true });
 });

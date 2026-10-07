@@ -121,7 +121,7 @@ test("the store works the same in memory as on disk, and never touches the disk"
 
 test("with copyEngineResults: false the store gives the same results and never changes the engine's own objects", async () => {
   const engine = await import("@heymrcarter/design-system/engine");
-  const constants = () => JSON.stringify({ BASE: engine.BASE, PALETTES: engine.PALETTES, BRANDS: engine.BRANDS, FONTS: engine.FONTS, GRAYS: engine.GRAYS });
+  const constants = () => JSON.stringify({ BASE: engine.BASE, FONTS: engine.FONTS, GRAYS: engine.GRAYS });
   const before = constants();
   const run = async (copyEngineResults) => {
     const memory = await projectInMemory(), store = createStore(memory, { copyEngineResults });

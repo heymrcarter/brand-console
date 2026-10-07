@@ -3,6 +3,10 @@
     "northfield",
     "crestline"
   ],
+  "brandNames": {
+    "northfield": "Northfield",
+    "crestline": "Crestline"
+  },
   "fonts": {
     "heading": "Public Sans",
     "body": "Public Sans",

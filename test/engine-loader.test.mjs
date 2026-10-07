@@ -22,7 +22,7 @@ test("every engine name that Node code uses is found", () => {
 });
 
 test("it hands back Node objects and leaves out JavaScript's own names", () => {
-  assert.ok(Array.isArray(E.BRANDS) && E.BASE instanceof Object);
+  assert.ok(Array.isArray(E.brandList(E.BASE)) && E.BASE instanceof Object);
   assert.ok(E.runChecks(E.withDefaults(E.BASE)) instanceof Array);
   assert.equal(typeof E.nextVer("1.4.0", "major"), "string");
   for (const n of ["Math", "JSON", "Object", "Array", "undefined", "NaN", "toString", "constructor", "hasOwnProperty"]) assert.ok(!Object.hasOwn(E, n), `${n} is not part of the engine`);
