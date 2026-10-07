@@ -22,8 +22,8 @@
     "check:all": "npm test && npm run test:worker && npm run audit && npm run check:colors && npm run stress && npm run sweep"
   },
   "dependencies": {
-    "@heymrcarter/design-system": "1.0.0",
-    "@heymrcarter/design-system-storybook": "1.0.0",
+    "@heymrcarter/design-system": "1.0.2",
+    "@heymrcarter/design-system-storybook": "1.0.2",
     "jose": "^6.2.12"
   },
   "devDependencies": {
