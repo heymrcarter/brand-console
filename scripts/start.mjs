@@ -1,7 +1,7 @@
 // Runs the Brand Console on your computer the way Cloudflare runs it.
 //   - The real Worker, in wrangler dev (Cloudflare's workerd runtime).
 //   - A stand-in for GitHub (scripts/fake-github.mjs) holding the sample design system in fixtures/sample, so you
-//     need no GitHub account, no Cloudflare account, and no internet. Saves and publishes stay until you stop it.
+//     need no GitHub account, no Cloudflare account, and no internet. Edits and proposals stay until you stop it.
 //   - Storybook at /storybook, from the @heymrcarter/design-system-storybook package, like on Cloudflare.
 // It finds a free port on its own, prints the link, and opens the console in your browser.
 // To run against a real GitHub repository instead, use npm run worker:dev with settings in .dev.vars.
@@ -57,7 +57,7 @@ const consolePort = await freePort(Number(process.env.PORT || 5173));
 if (consolePort !== 5173) console.log("\n  Another program was using the usual port, so this link uses a different number.");
 
 const state = fs.mkdtempSync(path.join(os.tmpdir(), "brand-console-"));
-const fake = await startFakeGitHub(path.join(root, "fixtures", "sample"), { onWrite: (msg) => console.log(`  Published to the stand-in for GitHub: ${msg.split("\n")[0]}`) });
+const fake = await startFakeGitHub(path.join(root, "fixtures", "sample"), { draftPRs: process.env.DRAFT_PRS !== "0" });
 const worker = await startWranglerDev({
   root, port: consolePort, persistTo: state,
   vars: { GITHUB_REPO: FAKE_REPO, GITHUB_TOKEN: FAKE_TOKEN, GITHUB_API: fake.url, ACCESS_LOCAL_DEV: "allow",
@@ -78,6 +78,11 @@ console.log(`
   Brand Console:  ${worker.base}
   Storybook:      ${worker.base}/storybook/
 
-  Saves and publishes last until you stop. To stop, press Ctrl + C.
+  Edits and proposals last until you stop. To stop, press Ctrl + C.
+
+  Nobody reviews pull requests here. To land or withdraw a proposal the way a reviewer would:
+    curl -X POST ${fake.url}/_local/pulls/1/merge     (lands it, and releases its version)
+    curl -X POST ${fake.url}/_local/pulls/1/close     (withdraws it)
+  To try a repository with no draft pull requests: DRAFT_PRS=0 npm start
 `);
 openBrowser(worker.base);

@@ -3,7 +3,7 @@
 // Every request comes here first, including the console's own files (run_worker_first in wrangler.jsonc), so nothing
 // is served without a Cloudflare Access sign-in. Then:
 //   /api/*                      the console's API, run by the design system's Durable Object
-//   /dist/ /build/ /fonts/      design system files, from GitHub and any changes not yet published
+//   /fonts/                     uploaded font files, from GitHub and the edits
 //   anything else               the console and Storybook, as static files
 import { createAccess } from "./access.mjs";
 
@@ -39,7 +39,7 @@ export default {
       const r = await designSystem.api(request.method, url.pathname, body, user);
       return json(r.status, r.body);
     }
-    if (/^\/(dist|build|fonts)\//.test(url.pathname)) {
+    if (/^\/fonts\//.test(url.pathname)) {
       let path;
       try { path = decodeURIComponent(url.pathname.slice(1)); } catch { return new Response("Not found", { status: 404 }); }
       const bytes = await designSystem.file(path);

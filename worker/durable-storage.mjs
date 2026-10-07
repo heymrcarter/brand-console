@@ -74,3 +74,15 @@ export function createDurableSecrets(sql, env = {}) {
     },
   };
 }
+
+/** Small records the console keeps, like the open proposal, as text by key. Empty text removes one. */
+export function createDurableKV(sql) {
+  sql.exec("CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+  return {
+    async get(key) { const r = sql.exec("SELECT value FROM kv WHERE key = ?", String(key)).toArray()[0]; return r ? r.value : ""; },
+    async set(key, value) {
+      if (value) sql.exec("INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)", String(key), String(value));
+      else sql.exec("DELETE FROM kv WHERE key = ?", String(key));
+    },
+  };
+}

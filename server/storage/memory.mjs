@@ -29,3 +29,12 @@ export function createMemorySecrets(values = {}) {
     async set(name, value) { if (value) data[name] = value; else delete data[name]; },
   };
 }
+
+/** Small records kept in memory, by key, for tests and local runs. Empty text removes one. */
+export function createMemoryKV(values = {}) {
+  const data = { ...values };
+  return {
+    async get(key) { return data[key] || ""; },
+    async set(key, value) { if (value) data[key] = String(value); else delete data[key]; },
+  };
+}

@@ -22,7 +22,7 @@ const plainErr = (status, message) => Object.assign(new Error(message), { status
 const bytesToBase64 = (bytes) => { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); };
 const base64ToBytes = (b64) => Uint8Array.from(atob(String(b64).replace(/\s+/g, "")), (c) => c.charCodeAt(0));
 // The name Git gives a file's content, so a file already on GitHub is never uploaded again.
-async function gitBlobSha(bytes) {
+export async function gitBlobSha(bytes) {
   const head = new TextEncoder().encode(`blob ${bytes.length}\0`), all = new Uint8Array(head.length + bytes.length);
   all.set(head); all.set(bytes, head.length);
   return [...new Uint8Array(await crypto.subtle.digest("SHA-1", all))].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -183,5 +183,7 @@ export function createGitHubStorage({ repo, branch = "main", token, pending, aut
     commit,
     /** What the next commit will send, for the console to show. */
     waiting,
+    /** Forgets which commit the branch was at, so the next read checks GitHub. For when someone else moved it. */
+    refresh() { head = null; },
   };
 }

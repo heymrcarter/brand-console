@@ -1,26 +1,28 @@
-// Reads and writes the design system through a storage (see server/storage/storage.mjs).
-//   tokens/      the draft (what the console edits). W3C design token files.
-//   releases/    one folder per published version, plus index.json.
-//   dist/        the live version's outputs (theme.css and friends).
-//   build/draft/ the draft's outputs, rebuilt on every save (Storybook uses these).
-//   fonts/       font files the brand team uploaded.
+// Reads and writes the design system through a storage (see server/storage/storage.mjs). The storage holds the
+// design system repository's files, as the console sees them:
+//   tokens/        W3C design token files. With the edits on top, they are the draft.
+//   fonts/         font files the brand team uploaded.
+//   package.json   the live version's number.
+// live is the same repository without the edits: what has landed. On GitHub, storage is the main branch plus the
+// edits waiting in the Durable Object, and live is the main branch alone. Edits never go to main from here: they
+// go to a proposal (server/proposals.mjs), and land when its pull request is merged.
 // This file never touches the disk itself, so the same code can run in a Cloudflare Worker with another storage.
-// Every method is async, and they run one at a time, so a save can never land in the middle of a publish.
+// Every method is async, and they run one at a time, so two saves never mix.
 import { loadEngine } from "./engine.mjs";
 
 // copyEngineResults: false skips the engine's defensive copies (see server/engine.mjs), for the Worker. The store
 // never changes what the engine hands back, so its results are the same either way.
-export function createStore(storage, { copyEngineResults = true } = {}) {
+export function createStore(storage, { live = storage, copyEngineResults = true } = {}) {
   const E = loadEngine(undefined, { copy: copyEngineResults });
-  const readJson = async (p) => { const t = await storage.read(p); return t === null ? null : JSON.parse(t); };
+  const readJson = async (s, p) => { const t = await s.read(p); return t === null ? null : JSON.parse(t); };
   const writeFile = (p, data) => storage.write(p, typeof data === "string" || data instanceof Uint8Array ? data : JSON.stringify(data, null, 2) + "\n");
   const err = (status, message) => Object.assign(new Error(message), { status });
 
-  // The token files under dir, keyed like "tokens/brands/northfield.tokens.json", whatever dir is.
-  async function readTokenDir(dir) {
-    const keys = (await storage.list(dir)).filter((k) => k.endsWith(".json"));
+  // The token files under dir, keyed like "tokens/brands/brand.tokens.json", whatever dir is.
+  async function readTokenDir(dir, from = storage) {
+    const keys = (await from.list(dir)).filter((k) => k.endsWith(".json"));
     const skip = dir ? dir.replace(/\/$/, "").length + 1 : 0;
-    const values = await Promise.all(keys.map(readJson));
+    const values = await Promise.all(keys.map((k) => readJson(from, k)));
     return Object.fromEntries(keys.map((k, i) => ["tokens/" + k.slice(skip), values[i]]));
   }
   // A token file the state no longer has, like a removed brand's, is deleted. The engine reads every brand file it finds.
@@ -28,22 +30,6 @@ export function createStore(storage, { copyEngineResults = true } = {}) {
     const keep = new Set(Object.keys(files).filter((k) => k.startsWith("tokens/")).map((k) => `${dir}/${k.slice(7)}`));
     const gone = (await storage.list(`${dir}/brands`)).filter((p) => p.endsWith(".json") && !keep.has(p));
     await Promise.all([...[...keep].map((p) => writeFile(p, files["tokens/" + p.slice(dir.length + 1)])), ...gone.map((p) => storage.remove(p))]);
-  }
-  // f: outputs already made for this state and version, so a publish makes them once for both folders.
-  async function writeOutputs(dir, st, version, f = E.files(st, version)) {
-    await Promise.all(Object.entries(f).filter(([k]) => !k.startsWith("tokens/")).map(([k, v]) => writeFile(`${dir}/${k}`, v)));
-    await copyFonts(dir, st);
-  }
-  // The company's own font files go next to theme.css, so its @font-face rules find them.
-  function fontFiles(st) {
-    const files = (st && st.fontLib && st.fontLib.files) || {};
-    return Object.values(files).flat().map((x) => x && x.file).filter((f) => typeof f === "string" && /^fonts\/[a-z0-9._-]+$/i.test(f));
-  }
-  async function copyFonts(dir, st) {
-    for (const f of fontFiles(st)) {
-      const bytes = await storage.readBytes(f);
-      if (bytes) await storage.write(`${dir}/${f}`, bytes);
-    }
   }
   // Saves an uploaded font file into the fonts folder. Returns its path, like fonts/avenir-next-400.woff2.
   async function saveFont({ family, weight, style, fileName, data }) {
@@ -59,86 +45,42 @@ export function createStore(storage, { copyEngineResults = true } = {}) {
     return { file: "fonts/" + name };
   }
 
-  const index = async () => (await readJson("releases/index.json")) || { versions: [] };
-  const saveIndex = (ix) => writeFile("releases/index.json", ix);
-  const latest = async () => (await index()).versions[0];
-
-  async function stateOfRelease(version) {
-    const st = E.filesToState(await readTokenDir(`releases/v${version}/tokens`));
-    st.version = version;
-    return st;
-  }
-  async function draft() {
-    const st = E.filesToState(await readTokenDir("tokens"));
-    const l = await latest(); st.version = l ? l.version : "0.0.0";
-    return st;
-  }
-  async function published() { const l = await latest(); return l ? stateOfRelease(l.version) : draft(); }
+  /** The live version's number, from the repository's package.json. */
+  async function version() { const pkg = await readJson(live, "package.json"); return (pkg && pkg.version) || "0.0.0"; }
+  /** What has landed: the repository without the edits. */
+  async function published() { const st = E.filesToState(await readTokenDir("tokens", live)); st.version = await version(); return st; }
+  /** The edits: the repository with them on top. */
+  async function draft() { const st = E.filesToState(await readTokenDir("tokens")); st.version = await version(); return st; }
 
   function clean(st) {
-    if (!st || typeof st !== "object" || !st.brands || !st.type || !st.comp) throw new Error("The design system data is missing parts.");
+    if (!st || typeof st !== "object" || !st.brands || !st.type || !st.comp) throw err(400, "The design system data is missing parts.");
     return E.withDefaults(E.clone(st));
   }
   async function saveDraft(st) {
-    st = clean(st);
-    await writeTokenDir("tokens", E.stateToFiles(st));
-    const l = await latest();
-    await writeOutputs("build/draft", st, (l ? l.version : "0.0.0") + "-draft");
+    await writeTokenDir("tokens", E.stateToFiles(clean(st)));
     return { ok: true, savedAt: new Date().toISOString() };
   }
-  async function buildAll() {
-    const d = await draft(), l = await latest();
-    await writeOutputs("build/draft", d, (l ? l.version : "0.0.0") + "-draft");
-    if (l) await writeOutputs("dist", await stateOfRelease(l.version), l.version);
-  }
-  async function release(st, version, meta) {
-    st = clean(st); st.version = version;
-    const dir = `releases/v${version}`;
-    await writeTokenDir(`${dir}/tokens`, E.stateToFiles(st));
-    const f = E.files(st, version);
-    await writeOutputs(dir, st, version, f);
-    await writeOutputs("dist", st, version, f);
-    const ix = await index();
-    ix.versions.unshift({ version, date: meta.date || new Date().toISOString().slice(0, 10), who: meta.who || "Brand team", note: meta.note || "Updated the design system.", ...(meta.rollbackOf ? { rollbackOf: meta.rollbackOf } : {}) });
-    await saveIndex(ix);
-    const prev = ((await storage.read("CHANGELOG.md")) || "").replace(/^# Changelog\n+/, "");
-    await writeFile("CHANGELOG.md", `# Changelog\n\n## ${version} (${ix.versions[0].date})\n\n${ix.versions[0].note}\n\n_${ix.versions[0].who}_\n\n${prev}`);
-    await storage.commit(`Publish design system v${version}: ${ix.versions[0].note.slice(0, 60)}`);
-    return version;
-  }
-  // bump: "patch", "minor", or "major". Without one, it is "minor", like before.
-  async function publish({ note, who, bump }) {
-    const d = await draft(), l = await latest();
-    const blocking = E.runChecks(d).filter((x) => x.level === "block");
-    if (blocking.length) throw err(409, `${blocking.length} check${blocking.length > 1 ? "s" : ""} must be fixed first: ${blocking.map((b) => b.title).join(" ")}`);
-    if (l && E.diff(await published(), d).length === 0) throw err(409, "Your draft has no changes to publish.");
-    if (bump !== undefined && !["patch", "minor", "major"].includes(bump)) throw err(400, 'The version bump must be "patch", "minor", or "major".');
-    // Without a bump, the one the changes call for: removing a brand is major, adding one is minor.
-    const v = l ? E.nextVer(l.version, bump || E.bumpFor(await published(), d).bump) : "1.0.0";
-    await release(d, v, { note, who });
-    return v;
-  }
-  async function rollback({ version, who }) {
-    const target = await stateOfRelease(version), pub = await published(), d = await draft(), l = await latest();
-    const pending = E.diff(pub, d);
-    // A rollback is always a minor version, so apps can tell it apart from a fix.
-    const v = E.nextVer(l.version, "minor");
-    await release(target, v, { note: `Rolled back to version ${version}.`, who, rollbackOf: version });
-    // Keep the person's unpublished changes on top of the rolled-back version.
-    let nd = E.clone(target);
-    for (const c of pending) { if (c.path.endsWith(".palette")) E.setP(nd, c.path, E.getP(d, c.path)); else E.setP(nd, c.path, c.to); }
+  /**
+   * Makes the edits an earlier version, keeping the edits made on top of the live one. The person then adds it
+   * to the proposal like any other change. target is that version's design system.
+   */
+  async function restore(target) {
+    const pub = await published(), d = await draft();
+    const nd = E.clone(target);
+    for (const c of E.diff(pub, d)) {
+      if (c.path === "brandOrder") continue;
+      const v = E.getP(d, c.path);
+      // Walked here, not with E.getP: the engine may hand back a copy (copyEngineResults), and this must change nd itself.
+      if (v === undefined) { const ks = c.path.split("."); const parent = ks.slice(0, -1).reduce((o, k) => (o == null ? o : o[k]), nd); if (parent) delete parent[ks.at(-1)]; }
+      else E.setP(nd, c.path, E.clone(v));
+    }
     await saveDraft(nd);
-    return v;
-  }
-  async function flag(version) {
-    const ix = await index(); const x = ix.versions.find((v) => v.version === version);
-    if (!x) throw err(404, "That version does not exist.");
-    x.flag = !x.flag; await saveIndex(ix); return x.flag;
+    return draft();
   }
 
   // One at a time: each call waits for the one before it to finish, even if that one failed.
   let queue = Promise.resolve();
   const oneAtATime = (fn) => (...a) => { const run = queue.then(() => fn(...a)); queue = run.catch(() => {}); return run; };
-  const api = { draft, published, index, saveDraft, publish, rollback, flag, buildAll, release, readTokenDir, stateOfRelease, saveFont };
-  return { E, ...Object.fromEntries(Object.entries(api).map(([k, f]) => [k, oneAtATime(f)])) };
+  const api = { draft, published, saveDraft, restore, readTokenDir, saveFont };
+  return { E, storage, ...Object.fromEntries(Object.entries(api).map(([k, f]) => [k, oneAtATime(f)])) };
 }

@@ -17,7 +17,7 @@ const KEY = "ABCDEFGHIJ1234", LINK = `https://www.figma.com/design/${KEY}/Brand-
 
 before(async () => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), "bc-figma-"));
-  for (const d of ["tokens", "releases"]) fs.cpSync(path.join(here, "fixtures/sample", d), path.join(root, d), { recursive: true });
+  fs.cpSync(path.join(here, "fixtures/sample/tokens"), path.join(root, "tokens"), { recursive: true });
   mock = await startFigmaMock({ fileKey: KEY });
   // The team's existing library: a Brand colors collection with a different Northfield main color, plus styles.
   const c = mock.addCollection("Brand colors", ["Northfield", "Crestline"]);
@@ -233,7 +233,7 @@ test("file names and Figma's color formats are understood", async () => {
   assert.equal(v.vals["brand::Main color@@Northfield"], "#FF8000");
 });
 
-test("uploaded fonts reach theme.css, settings.json, and the outputs folder", async () => {
+test("uploaded fonts reach theme.css and settings.json", async () => {
   const saved = await store.saveFont({ family: "Avenir Next", weight: 400, style: "normal", fileName: "AvenirNext-Regular.woff2", data: Buffer.alloc(400, 7).toString("base64") });
   assert.equal(saved.file, "fonts/avenir-next-400.woff2");
   assert.deepEqual(fs.readFileSync(path.join(root, saved.file)), Buffer.alloc(400, 7), "the font file is saved as it was sent, not as text");
@@ -244,10 +244,9 @@ test("uploaded fonts reach theme.css, settings.json, and the outputs folder", as
   await store.saveDraft(d);
   const back = await store.draft();
   assert.deepEqual(back.fontLib.removed, ["Merriweather"]);
-  const css = fs.readFileSync(path.join(root, "build/draft/theme.css"), "utf8");
+  // The design system's build makes these from the tokens, and copies fonts/ next to theme.css.
+  const out = E.files(back, "1.5.1"), css = out["theme.css"], settings = out["settings.json"];
   assert.match(css, /@font-face \{ font-family: 'Avenir Next'; src: url\("\.\/fonts\/avenir-next-400\.woff2"\) format\("woff2"\)/);
-  assert.ok(fs.existsSync(path.join(root, "build/draft/fonts/avenir-next-400.woff2")));
-  const settings = JSON.parse(fs.readFileSync(path.join(root, "build/draft/settings.json"), "utf8"));
   assert.deepEqual(settings.fonts.needLicense, []);
   assert.match(settings.fonts.href, /family=Nunito:wght@400;700/);
   assert.equal(settings.fonts.files[0].file, "fonts/avenir-next-400.woff2");

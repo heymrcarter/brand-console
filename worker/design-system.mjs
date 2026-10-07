@@ -1,17 +1,21 @@
 // One design system's server side, as a Durable Object. There is one per GitHub repository and branch.
 //
-// Every save and publish for that design system runs here, one at a time, which is what a Durable Object is for:
-// a single place that orders the writes, however many copies of the Worker are running. Changes wait in this
-// object's SQLite database until a publish commits them to GitHub, so they last if the object restarts.
+// Every save and proposal for that design system runs here, one at a time, which is what a Durable Object is for:
+// a single place that orders the writes, however many copies of the Worker are running. The edits wait in this
+// object's SQLite database, on top of the repository's main branch, so they last if the object restarts. They go to
+// GitHub only as changes on a proposal's branch (server/proposals.mjs), never straight to main.
 import { DurableObject } from "cloudflare:workers";
 import { createStore } from "../server/store.mjs";
 import { createFigma } from "../server/figma.mjs";
 import { createApi } from "../server/api.mjs";
+import { createProposals } from "../server/proposals.mjs";
+import { createGitHubClient } from "../server/github-client.mjs";
+import { createMemoryStorage } from "../server/storage/memory.mjs";
 import { createAsk } from "../server/ask.mjs";
 import { createGitHubStorage } from "../server/storage/github.mjs";
 import { createGitHubAppToken } from "../server/storage/github-app.mjs";
 import { storageKey } from "../server/storage/storage.mjs";
-import { createDurableStorage, createDurableSecrets } from "./durable-storage.mjs";
+import { createDurableStorage, createDurableSecrets, createDurableKV } from "./durable-storage.mjs";
 
 const plainErr = (status, message) => Object.assign(new Error(message), { status });
 
@@ -30,17 +34,20 @@ export class DesignSystem extends DurableObject {
     const env = this.env;
     if (!env.GITHUB_REPO) throw plainErr(503, 'Set GITHUB_REPO to the repository that holds the design system, like "acme/design-system".');
     const sql = this.ctx.storage.sql;
-    const storage = createGitHubStorage({ repo: env.GITHUB_REPO, branch: env.GITHUB_BRANCH || "main", token: githubToken(env), pending: createDurableStorage(sql), apiBase: env.GITHUB_API || undefined });
+    const token = githubToken(env), branch = env.GITHUB_BRANCH || "main", apiBase = env.GITHUB_API || undefined;
+    // storage: main with the edits on top. live: main alone, what has landed.
+    const storage = createGitHubStorage({ repo: env.GITHUB_REPO, branch, token, pending: createDurableStorage(sql), apiBase });
+    const live = createGitHubStorage({ repo: env.GITHUB_REPO, branch, token, pending: createMemoryStorage(), apiBase });
     // The Worker has 10 ms of CPU per request on the free plan, so the engine's results are not copied. See server/engine.mjs.
-    const store = createStore(storage, { copyEngineResults: false });
+    const store = createStore(storage, { live, copyEngineResults: false });
+    const github = createGitHubClient({ repo: env.GITHUB_REPO, token, apiBase });
+    const proposals = createProposals({ github, store, edits: storage, kv: createDurableKV(sql), base: branch, previewUrl: env.STORYBOOK_PREVIEW_URL || "", onLanded: () => { storage.refresh(); live.refresh(); } });
     const figma = createFigma({ storage, secrets: createDurableSecrets(sql, env), store, apiBase: env.FIGMA_API || undefined });
     const model = env.ANTHROPIC_MODEL || "claude-sonnet-5";
     const api = createApi({
-      store, figma,
+      store, proposals, figma,
       ask: createAsk({ key: env.ANTHROPIC_API_KEY, model, missingKeyHelp: "Set it with: npx wrangler secret put ANTHROPIC_API_KEY" }),
-      info: () => ({ ai: !!env.ANTHROPIC_API_KEY, model, storybook: env.STORYBOOK_URL || "/storybook", shared: true, github: { repo: env.GITHUB_REPO, branch: env.GITHUB_BRANCH || "main" } }),
-      // Each version is credited to the person Cloudflare Access signed in.
-      credit: (who, user) => (user && user.email ? user.email : who),
+      info: () => ({ ai: !!env.ANTHROPIC_API_KEY, model, storybook: env.STORYBOOK_URL || "/storybook", github: { repo: env.GITHUB_REPO, branch } }),
       // Everyone is an admin for now. Later: map Microsoft Entra ID groups to "viewer", "editor", and "admin" here.
       roleOf: () => "admin",
     });
@@ -60,11 +67,11 @@ export class DesignSystem extends DurableObject {
     }
   }
 
-  /** A file from dist/, build/, or fonts/, as bytes, or null. */
+  /** An uploaded font file, as bytes, or null. The page loads them for its previews. */
   async file(path) {
     let key;
     try { key = storageKey(path); } catch { return null; }
-    if (!/^(dist|build|fonts)\//.test(key)) return null;
+    if (!/^fonts\//.test(key)) return null;
     return this.parts().storage.readBytes(key);
   }
 }
