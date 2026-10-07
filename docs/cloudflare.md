@@ -39,6 +39,7 @@ On the **Variables** tab, add these. GitHub does not allow names that start with
 |---|---|---|
 | `REPO` | The design system repository, like `acme/design-system`. Proposals are pull requests to it. | `GITHUB_REPO` |
 | `BRANCH` | Its main branch, which proposals go into. Usually `main`. | `GITHUB_BRANCH` |
+| `REVIEWERS` | Optional: GitHub logins to ask for a review when a proposal is submitted, separated by commas, like `sam,lee`. They need access to the design system repository. People can also be asked on the pull request. | `REVIEWERS` |
 | `STORYBOOK_PREVIEW_URL` | Optional: where each pull request's Storybook is, with `{number}` for the pull request, like `https://pr-{number}-design-system-storybook.acme.workers.dev`. The console links to it. | `STORYBOOK_PREVIEW_URL` |
 | `GH_APP_ID` | The App ID from step 1 | `GITHUB_APP_ID` |
 | `GH_APP_INSTALLATION_ID` | The installation ID from step 1 | `GITHUB_APP_INSTALLATION_ID` |
