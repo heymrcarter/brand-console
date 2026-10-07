@@ -9,10 +9,11 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { loadEngine } from "../server/engine.mjs";
 import { createStore } from "../server/store.mjs";
-import { createDiskStorage } from "../server/storage/disk.mjs";
+import { createMemoryStorage } from "../server/storage/memory.mjs";
+import { sampleFiles } from "../test/helpers/sample-repo.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const E = loadEngine(root), store = createStore(createDiskStorage(path.join(root, "fixtures/sample")));
+const E = loadEngine(root), store = createStore(createMemoryStorage(sampleFiles()));
 const draft = await store.draft(), published = await store.published();
 const problems = [];
 const bad = (where, what) => problems.push(`${where}: ${what}`);
@@ -33,13 +34,6 @@ const back = E.filesToState(E.stateToFiles(draft));
 const flat = (o, p = "", out = {}) => { for (const k in o) { const v = o[k], q = p ? p + "." + k : k; if (v && typeof v === "object") flat(v, q, out); else out[q] = v; } return out; };
 const fa = flat(draft), fb = flat(back);
 for (const k of new Set([...Object.keys(fa), ...Object.keys(fb)])) if (k !== "version" && String(fa[k]) !== String(fb[k])) bad("Token files", `${k} is ${fa[k]} in the draft but ${fb[k]} after saving and loading`);
-
-// 2. theme.css on disk matches the engine for the draft and the live version.
-for (const [label, st, file] of [["Draft", draft, "build/draft/theme.css"], ["Live", published, "dist/theme.css"]]) {
-  const css = fs.readFileSync(path.join(root, "fixtures/sample", file), "utf8");
-  const want = E.themeCss(st, st.version || "draft").replace(/^\/\* Generated.*\n/, "");
-  if (css.replace(/^\/\* Generated.*\n/, "") !== want) bad(file, `${label} theme.css is out of date. Run npm run build.`);
-}
 
 // 3-5. Browser checks.
 const protoFile = path.join(tmpdir(), "brand-console-consistency.html");

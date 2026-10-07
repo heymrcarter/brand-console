@@ -57,3 +57,12 @@ test("after a deploy, the address must send people to Cloudflare Access", async 
   await assert.rejects(checkSignInWall("https://bc.example.workers.dev", answer(302, "https://evil.example/login")), /answered 302 \(to https:\/\/evil/);
   await assert.rejects(checkSignInWall("https://bc.example.workers.dev", answer(403)), /Check that Access is turned on/);
 });
+
+test("a Storybook preview address is optional, and must say where the pull request number goes", async () => {
+  const none = await checkSettings({ ...good, GH_APP_PRIVATE_KEY: KEY });
+  assert.equal(none.vars.STORYBOOK_PREVIEW_URL, undefined);
+  const ok = await checkSettings({ ...good, GH_APP_PRIVATE_KEY: KEY, STORYBOOK_PREVIEW_URL: "https://pr-{number}-design-system-storybook.acme.workers.dev" });
+  assert.equal(ok.vars.STORYBOOK_PREVIEW_URL, "https://pr-{number}-design-system-storybook.acme.workers.dev");
+  const bad = await checkSettings({ ...good, GH_APP_PRIVATE_KEY: KEY, STORYBOOK_PREVIEW_URL: "https://pr-design-system-storybook.acme.workers.dev" });
+  assert.ok(bad.problems.some((p) => /\{number\}/.test(p)));
+});

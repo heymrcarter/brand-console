@@ -19,7 +19,7 @@ page.on("pageerror", e => errs.push(String(e)));
 await page.goto(pathToFileURL(file).href);
 await page.waitForFunction(() => typeof S !== "undefined" && S.draft);
 
-const secs = await page.evaluate(() => ["color", "type", "space", "shape", "library", "checks", "publish", "history", "export", "figma", ...REG_ORDER]);
+const secs = await page.evaluate(() => ["color", "type", "space", "shape", "library", "checks", "proposal", "brands", "history", "export", "figma", ...REG_ORDER]);
 const combos = [];
 for (const chrome of ["light"]) for (const brand of ["northfield", "crestline"]) for (const mode of ["light", "dark"]) for (const ctx of ["consumer", "employee"]) combos.push({ chrome, brand, mode, ctx });
 

@@ -4,15 +4,16 @@ This note is for the engineers who put the console online for the brand team. It
 
 ## In short
 
-- **Where things live.** The design system's files stay in GitHub, in the same folders as on your computer. The console reads them from one branch. Every publish is one commit on that branch, so `dist/`, `releases/`, and the change log update the same way as before.
-- **Unpublished changes** wait in a Durable Object (a small database Cloudflare keeps for the Worker) until someone publishes. They are not lost if the Worker restarts. Saving a draft never commits to GitHub.
+- **Where things live.** The design system is its own GitHub repository. The console reads it from main: that is the live version, with the number in its `package.json`. The console never writes to main.
+- **Edits** wait in a Durable Object (a small database Cloudflare keeps for the Worker), on top of main. They are not lost if the Worker restarts. Saving never commits to GitHub.
+- **Proposals.** Adding edits to a proposal makes one commit on a proposal branch, and the first one opens a pull request. When a reviewer merges it, the design system's own Release workflow releases the new version. The console sees that it landed the next time it loads.
 - **Sign-in.** Cloudflare Access signs people in with the company's identity provider. The Worker checks Access's signed token on every request, including the console page. Until Access is set up, the Worker refuses everything.
-- **Who did what.** Each version in the history shows the email of the person who signed in, like `maya@company.com`. The top of the console shows who you are signed in as. Everyone is an admin for now; roles from Microsoft Entra ID groups come later.
+- **Who did what.** Each change in a proposal is a commit credited to the person who signed in, like `maya@company.com`. The top of the console shows who you are signed in as. Everyone is an admin for now; roles from Microsoft Entra ID groups come later.
 
 ## What you need
 
 - A Cloudflare account. The free plan works (see "Free or paid" below).
-- A GitHub repository with the design system in it: this project, or a copy of it.
+- The design system repository, like `heymrcarter/design-system`, with its Release workflow.
 - Node.js 22.12 or newer, and this project with `npm install` done.
 
 ## 1. Make a GitHub App
@@ -22,7 +23,7 @@ A GitHub App can only reach the repositories it is installed on, and its tokens 
 1. On GitHub, go to **Settings > Developer settings > GitHub Apps > New GitHub App**. For a company account, make it under the organization's settings instead.
 2. Name it, like "Brand Console". The homepage URL can be the repository's address.
 3. Turn **Webhook** off.
-4. Under **Repository permissions**, set **Contents** to **Read and write**. Leave everything else as it is. (Metadata: Read-only is added for you.)
+4. Under **Repository permissions**, set **Contents** and **Pull requests** to **Read and write**. Leave everything else as it is. (Metadata: Read-only is added for you.) Contents lets it push proposal branches; Pull requests lets it open, update, submit, and close them.
 5. Pick **Only on this account**, then **Create GitHub App**.
 6. Note the **App ID** at the top of the page.
 7. Under **Private keys**, click **Generate a private key**. Your browser downloads a `.pem` file. Keep it somewhere safe. You need it in step 3.
@@ -30,14 +31,15 @@ A GitHub App can only reach the repositories it is installed on, and its tokens 
 
 ## 2. Add the settings to the repository
 
-GitHub Actions deploys the Worker from this repository, `brand-console` (`.github/workflows/deploy-worker.yml`), with settings stored here, not in `wrangler.jsonc`. In **this** repository, go to **Settings > Secrets and variables > Actions**. (The design system the console reads and publishes to is a different repository: `REPO` below.)
+GitHub Actions deploys the Worker from this repository, `brand-console` (`.github/workflows/deploy-worker.yml`), with settings stored here, not in `wrangler.jsonc`. In **this** repository, go to **Settings > Secrets and variables > Actions**. (The design system the console reads and proposes changes to is a different repository: `REPO` below.)
 
 On the **Variables** tab, add these. GitHub does not allow names that start with `GITHUB_`, so they are shorter than the Worker's own names:
 
 | Variable | What to put | The Worker sees it as |
 |---|---|---|
-| `REPO` | The repository the console reads the design system from and publishes to, like `acme/design-system`. | `GITHUB_REPO` |
-| `BRANCH` | The branch the console reads and publishes to. Usually `main`. | `GITHUB_BRANCH` |
+| `REPO` | The design system repository, like `acme/design-system`. Proposals are pull requests to it. | `GITHUB_REPO` |
+| `BRANCH` | Its main branch, which proposals go into. Usually `main`. | `GITHUB_BRANCH` |
+| `STORYBOOK_PREVIEW_URL` | Optional: where each pull request's Storybook is, with `{number}` for the pull request, like `https://pr-{number}-design-system-storybook.acme.workers.dev`. The console links to it. | `STORYBOOK_PREVIEW_URL` |
 | `GH_APP_ID` | The App ID from step 1 | `GITHUB_APP_ID` |
 | `GH_APP_INSTALLATION_ID` | The installation ID from step 1 | `GITHUB_APP_INSTALLATION_ID` |
 | `TEAM_DOMAIN` | Leave it out for now. Step 5 adds it. | `TEAM_DOMAIN` |
@@ -93,9 +95,9 @@ Do not set the Include rule to "Login methods: One-time PIN", or to "Emails endi
 
 The free plan gives a Worker 10 ms of CPU time per request, and allows 100,000 requests and 100,000 Durable Object row writes a day.
 
-- The console is built to fit. Measured in Node, saving a draft takes about 2 ms of CPU and publishing about 5 ms (7 ms at most). Cloudflare's servers may be slower than a laptop, so check: after a few publishes, open the Worker's **Metrics** in the dashboard and look at **CPU time**.
+- The console is built to fit. Saving edits takes a few milliseconds of CPU, and adding a change to a proposal a little more. Cloudflare's servers may be slower than a laptop, so check: after a few changes, open the Worker's **Metrics** in the dashboard and look at **CPU time**.
 - If requests fail with error 1102 ("Worker exceeded resource limits"), move to the Workers Paid plan ($5 a month). It allows up to 30 seconds of CPU time per request.
-- GitHub is the other limit. A Worker on the free plan can make 50 outgoing requests per request. Loading the console takes about 13 GitHub requests the first time and none after that, a save none, and a publish 4, plus one for each new font file.
+- GitHub is the other limit. A Worker on the free plan can make 50 outgoing requests per request. A test (`test/storage.test.mjs`) keeps loading the console and adding a change under that: loading takes about 20 GitHub requests the first time and a few after that, a save none, and adding a change 15 to 20, plus one for each new font file.
 
 ## Running it on your computer
 
@@ -112,11 +114,12 @@ npm run worker:dev
 
 `.dev.vars` holds secrets for `wrangler dev` and Git ignores it. `ACCESS_LOCAL_DEV=allow` lets requests to `localhost` in without Access. It does nothing on any other address, or once `TEAM_DOMAIN` and `POLICY_AUD` are set.
 
-To test the Worker without GitHub or Cloudflare, run `npm run test:worker`. It starts the real Worker in `wrangler dev` against a stand-in for GitHub and goes through saving, a large font, publishing, rolling back, and a restart.
+To test the Worker without GitHub or Cloudflare, run `npm run test:worker`. It starts the real Worker in `wrangler dev` against a stand-in for GitHub and goes through saving, a large font, a restart, a proposal that is submitted and lands, and rolling back.
 
 ## Good to know
 
 - **Storybook shows the design system version the console uses.** It comes from the `@heymrcarter/design-system-storybook` package, so the console's "Real component" preview does not follow each change. The console's own preview always does.
-- **If two people publish at the same moment,** the Durable Object runs one publish after the other. If someone pushes to the branch while a publish runs, the console builds its commit again on top of theirs.
-- **If someone edits the same file on GitHub** while the console has an unpublished change to it, the console's version wins when it publishes.
-- **Rolling back** is a new commit, like on your computer. Nothing is ever lost from the history.
+- **One proposal at a time.** Everyone in the console works on the same edits and the same proposal. If two people add a change at the same moment, the Durable Object adds one after the other.
+- **If main moves on** while a proposal is open, the next change is built on the new main, with the proposal's earlier commits and the edits. For the files the console writes, its version wins, so there are never merge conflicts.
+- **Draft pull requests.** GitHub only allows them on private repositories with a paid plan. Without them, a proposal is a branch the console keeps until you submit it, and then it opens the pull request.
+- **Rolling back** makes the edits an earlier version. It reaches apps when it is added to a proposal and lands. Nothing is ever lost from the history.

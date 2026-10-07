@@ -1,20 +1,25 @@
-// Restores the sample design system: three past versions and a draft with
-// the official color sets. Run with:  npm run reset-sample-data
+// Remakes the sample design system in fixtures/sample, shaped like the design system repository:
+//   history/v1.2.0/ ... v1.4.0/   the tokens of each earlier version (tagged releases on the GitHub stand-in)
+//   tokens/                       main, at the newest version, 1.5.0, with the official color sets
+//   releases.json                 each version's date and note
+// The tests, npm start, and the prototype use it. Run with:  npm run reset-sample-data
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createStore } from "../server/store.mjs";
-import { createDiskStorage } from "../server/storage/disk.mjs";
+import { loadEngine } from "../server/engine.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-// The sample design system: three past versions and a draft. Tests and npm start use it.
 const sample = path.join(root, "fixtures/sample");
-for (const d of ["tokens", "releases", "dist", "build"]) fs.rmSync(path.join(sample, d), { recursive: true, force: true });
-fs.rmSync(path.join(sample, "CHANGELOG.md"), { force: true });
-
-// Sample versions are not real publishes, so they stay out of Git history.
-const store = createStore({ ...createDiskStorage(sample), commit: async () => {} });
-const { E } = store;
+for (const d of ["tokens", "history"]) fs.rmSync(path.join(sample, d), { recursive: true, force: true });
+const E = loadEngine(root);
+function writeTokens(dir, st) {
+  for (const [p, v] of Object.entries(E.stateToFiles(E.withDefaults(E.clone(st))))) {
+    if (!p.startsWith("tokens/")) continue;
+    const to = path.join(dir, p.slice(7));
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    fs.writeFileSync(to, JSON.stringify(v, null, 2) + "\n");
+  }
+}
 // The sample has two made-up brands. The engine's own defaults have one starter brand, so they are set here.
 const BRANDS = {
   northfield: { name: "Northfield", division: "Consumer division", primary: "#6B2E83", secondary: "#2F5D8A", accent: "#D9653B", onPrimary: "white" },
@@ -43,11 +48,11 @@ const base = E.withDefaults({ ...E.clone(E.BASE), brands: E.clone(BRANDS) });
 const v12 = E.clone(base); v12.brands.northfield.primary = "#7A3F92"; v12.type.scale = 1.2; v12.shape.radius = 6; v12.comp.card.shadow = "none";
 const v13 = E.clone(base); v13.brands.northfield.primary = "#7A3F92"; v13.type.scale = 1.2;
 
-await store.release(v12, "1.2.0", { date: "2026-08-04", who: "Design system team", note: "Added the employee screen size. Employee screens now fit more rows on one page." });
-await store.release(v13, "1.3.0", { date: "2026-08-29", who: "Maya R. · Brand team", note: "Changed the Northfield main color to a deeper plum so white button words are easier to read." });
-await store.release(base, "1.4.0", { date: "2026-09-18", who: "Maya R. · Brand team", note: "Made the card shadow softer and raised the type scale so headings stand out more on consumer screens." });
+writeTokens(path.join(sample, "history/v1.2.0"), v12);
+writeTokens(path.join(sample, "history/v1.3.0"), v13);
+writeTokens(path.join(sample, "history/v1.4.0"), base);
 
-// The draft: the official color sets for both brands, and a new body font.
+// Main, 1.5.0: the official color sets for both brands, a new body font, and roomier buttons.
 const d = E.clone(base);
 d.brands.crestline.palette = E.clone(PALETTES.crestline);
 Object.assign(d.brands.crestline, { primary: "#1A3DA3", secondary: "#4AA1CC", accent: "#8ABC3F" });
@@ -56,6 +61,11 @@ Object.assign(d.brands.northfield, { primary: "#6A9835", secondary: "#88BC40", a
 d.type.body = "Atkinson Hyperlegible";
 d.type.ui = "Public Sans";
 Object.assign(d.comp.button, { track: "wide", pad: "roomy" });
-await store.saveDraft(d);
-await store.buildAll();
-console.log("Sample data restored: versions 1.2.0, 1.3.0, 1.4.0 and a draft with 2 color sets.");
+writeTokens(path.join(sample, "tokens"), d);
+fs.writeFileSync(path.join(sample, "releases.json"), JSON.stringify([
+  { version: "1.2.0", date: "2026-08-04", note: "Added the employee screen size. Employee screens now fit more rows on one page." },
+  { version: "1.3.0", date: "2026-08-29", note: "Changed the Northfield main color to a deeper plum so white button words are easier to read." },
+  { version: "1.4.0", date: "2026-09-18", note: "Made the card shadow softer and raised the type scale so headings stand out more on consumer screens." },
+  { version: "1.5.0", date: "2026-10-02", note: "Added the official color sets for both brands, a body font that is easier to read, and roomier buttons." },
+], null, 2).replace(/\n    /g, " ").replace(/\n  \}/g, " }") + "\n");
+console.log("Sample data remade: versions 1.2.0, 1.3.0, 1.4.0, and main at 1.5.0 with 2 color sets.");

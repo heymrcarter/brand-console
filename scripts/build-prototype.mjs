@@ -1,17 +1,23 @@
-// Builds a single-file version of the console that runs without the server,
-// using the sample data in releases/ and tokens/. Changes stay in the page.
+// Builds a single-file version of the console that runs without the server, using the sample design system in
+// fixtures/sample. Edits and proposals stay in the page.
 // Usage: node scripts/build-prototype.mjs out.html
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "vite";
 import { createStore } from "../server/store.mjs";
-import { createDiskStorage } from "../server/storage/disk.mjs";
+import { createMemoryStorage } from "../server/storage/memory.mjs";
+import { createGitHubClient } from "../server/github-client.mjs";
+import { createProposals } from "../server/proposals.mjs";
+import { createMemoryKV } from "../server/storage/memory.mjs";
+import { sampleFiles, sampleRepo } from "../test/helpers/sample-repo.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const out = process.argv[2] || path.join(root, "brand-console-prototype.html");
-const store = createStore(createDiskStorage(path.join(root, "fixtures/sample")));
-const ix = (await store.index()).versions;
-const embed = { draft: await store.draft(), published: await store.published(), history: ix, snaps: Object.fromEntries(await Promise.all(ix.map(async (v) => [v.version, await store.stateOfRelease(v.version)]))) };
+const store = createStore(createMemoryStorage(sampleFiles()));
+const mock = sampleRepo({ repo: "local/design-system", token: "t" });
+const proposals = createProposals({ github: createGitHubClient({ repo: "local/design-system", token: "t", fetch: mock.fetch }), store, edits: createMemoryStorage(), kv: createMemoryKV() });
+const history = await proposals.releases();
+const embed = { draft: await store.draft(), published: await store.published(), history, snaps: Object.fromEntries(await Promise.all(history.map(async (v) => [v.version, await proposals.stateOfVersion(v.version)]))) };
 const js = (f) => fs.readFileSync(path.join(root, "console", f), "utf8");
 const html = fs.readFileSync(path.join(root, "console", "index.html"), "utf8");
 const head = html.slice(html.indexOf("<head>") + 6, html.indexOf("</head>")).replace(/<meta[^>]*>\n?/g, "");

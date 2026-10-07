@@ -62,7 +62,7 @@ for (let i = 0; i < N; i++) {
   }, { i, base });
   if (setup.left.length) { skipped++; console.log(`Setup ${i + 1}: skipped, checks still block (${setup.left.join(", ")}). ${setup.summary}`); continue; }
   console.log(`Setup ${i + 1}: ${setup.summary}`);
-  const secs = await page.evaluate(() => ["color", "type", "space", "shape", "library", "checks", "publish", ...REG_ORDER]);
+  const secs = await page.evaluate(() => ["color", "type", "space", "shape", "library", "checks", "proposal", "brands", ...REG_ORDER]);
   for (const brand of ["northfield", "crestline"]) for (const mode of ["light", "dark"]) for (const sec of secs) {
     const ctx = (secs.indexOf(sec) + i) % 2 ? "employee" : "consumer";
     const found = await page.evaluate(new Function("c", `S.ui.brand=c.brand;S.ui.mode=c.mode;S.ui.ctx=c.ctx;S.sec=c.sec;S.ui.asst=true;render();\n${checker}\nreturn out;`), { brand, mode, sec, ctx });

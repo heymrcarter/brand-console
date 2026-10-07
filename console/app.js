@@ -5,6 +5,8 @@ const S={
   role:"admin", me:null,
   sec:"color",
   published:null,
+  base:null,             // the design system at the proposal's newest commit, or null with no proposal
+  proposal:null, notice:null,
   draft:null,
   ui:{brand:"",q:"",openCats:{},mode:"light",ba:false,baPos:50,chrome:null,compare:false,ctx:"consumer",size:"large",vp:"desktop",asst:window.innerWidth>1100,exportFile:"theme.css",src:"sample",baBase:"last",publishNote:null,confirmRb:null},
   history:[],
@@ -31,16 +33,17 @@ function showVal(p,v){
 /* Brands are data: the draft's brands, in order. The first one is the default. */
 function brands(){return brandList(S.draft);}
 function bn(id){return brandName(S.draft,id);}
-/* Undo puts a setting back the way it is live. A whole brand added or removed, and the brand order, are one change each. */
-function undoPath(p){
-  if(p==="brandOrder"){const pub=Object.keys(S.published.brands),cur=Object.keys(S.draft.brands);
+/* Undo puts an edit back the way it is in the proposal, or live with no proposal. A whole brand added or removed,
+   and the brand order, are one edit each. */
+function undoPath(p,from=baseState()){
+  if(p==="brandOrder"){const pub=Object.keys(from.brands),cur=Object.keys(S.draft.brands);
     S.draft.brands=Object.fromEntries([...pub.filter(id=>cur.includes(id)),...cur.filter(id=>!pub.includes(id))].map(id=>[id,S.draft.brands[id]]));return;}
   const wb=p.match(/^brands\.([^.]+)$/);
-  if(wb){const id=wb[1],was=S.published.brands[id];
+  if(wb){const id=wb[1],was=from.brands[id];
     if(!was){if(Object.keys(S.draft.brands).length<2){toast("A design system needs at least one brand, so I kept this one.");return;}delete S.draft.brands[id];return;}
-    const order=Object.keys(S.draft.brands);order.splice(Math.min(Object.keys(S.published.brands).indexOf(id),order.length),0,id);
+    const order=Object.keys(S.draft.brands);order.splice(Math.min(Object.keys(from.brands).indexOf(id),order.length),0,id);
     S.draft.brands=Object.fromEntries(order.map(x=>[x,x===id?clone(was):S.draft.brands[x]]));return;}
-  const v=getP(S.published,p);if(v===undefined){const ks=p.split(".");delete getP(S.draft,ks.slice(0,-1).join("."))[ks[ks.length-1]];}else setP(S.draft,p,clone(v));}
+  const v=getP(from,p);if(v===undefined){const ks=p.split(".");delete getP(S.draft,ks.slice(0,-1).join("."))[ks[ks.length-1]];}else setP(S.draft,p,clone(v));}
 /* =====================================================================
    HELPERS
    ===================================================================== */
@@ -72,7 +75,7 @@ const I={
     checks:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>',
     history:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>',
     export:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg>',
-    publish:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>'}
+    proposal:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>'}
 };
 function gbadge(s=24){return `<div class="gbadge" style="width:${s}px;height:${s}px">${I.spark(Math.round(s*.54))}</div>`;}
 function btn(label,a,o={}){const data=o.data?Object.entries(o.data).map(([k,v])=>` data-${k}="${esc(v)}"`).join(""):"";
@@ -84,7 +87,9 @@ const canEdit=()=>S.role!=="designer";
 const isAdmin=()=>S.role==="admin";
 const checks=()=>runChecks(S.draft);
 const counts=()=>{const c=checks();return {block:c.filter(x=>x.level==="block").length,warn:c.filter(x=>x.level==="warn").length,pass:c.filter(x=>x.level==="pass").length};};
-const changes=()=>diff(S.published,S.draft);
+/* Edits: what is not in the proposal yet. With no proposal, everything that is not live. */
+const baseState=()=>S.base||S.published;
+const changes=()=>diff(baseState(),S.draft);
 
 /* =====================================================================
    NAV
@@ -92,14 +97,14 @@ const changes=()=>diff(S.published,S.draft);
 const NAV=[
   ["Foundations",[["brands","Brands"],["color","Color"],["type","Type"],["space","Spacing and size"],["shape","Corners and shadows"],["icons","Icons"]]],
   ["Components",[]],
-  ["Release",[["checks","Checks"],["publish","Review and publish"],["history","Versions"],["export","Use it in apps and Figma"],["figma","Sync with Figma"]]]];
+  ["Release",[["checks","Checks"],["proposal","Proposal"],["history","Versions"],["export","Use it in apps and Figma"],["figma","Sync with Figma"]]]];
 const CAT_ICON={actions:"button",inputs:"field",structure:"field",feedback:"checks",content:"card",navigation:"export",overlays:"dialog",data:"select",layout:"shape",health:"checks"};
 function nrow(id,l,m="",cls=""){return `<button class="nrow${cls}${S.sec===id?" on":""}" data-a="go" data-s="${id}" ${S.sec===id?'aria-current="page"':""}>${cls?"":(I.n[id]||"")}<span>${esc(l)}</span>${m}</button>`;}
 function nav(){
   const k=counts(), ch=changes().length, q=(S.ui.q||"").trim().toLowerCase();
   const meta=id=>{if(id==="checks") return k.block?`<span class="m bad">${k.block} to fix</span>`:k.warn?`<span class="m">${k.warn} tips</span>`:"";
     if(id==="brands") return `<span class="m">${brands().length}</span>`;
-    if(id==="publish"&&ch) return `<span class="m">${ch} change${ch>1?"s":""}</span>`;if(id==="history") return `<span class="m">v${S.published.version}</span>`;
+    if(id==="proposal") return S.proposal?`<span class="m">${S.proposal.state==="in review"?"In review":"Draft"}</span>`:ch?`<span class="m">${ch} edit${ch>1?"s":""}</span>`:"";if(id==="history") return `<span class="m">v${S.published.version}</span>`;
     if(id==="figma") return S.figma&&S.figma.connected?`<span class="m">${S.figma.lastSync?agoShort(S.figma.lastSync):"Ready"}</span>`:"";return "";};
   const curCat=REG[S.sec]&&REG[S.sec].cat;
   let comps=`<div class="navfind"><input id="navq" type="search" placeholder="Find a component" value="${esc(S.ui.q||"")}" aria-label="Find a component" autocomplete="off"></div>`+nrow("library","All components",`<span class="m">${REG_ORDER.length}</span>`);
@@ -110,16 +115,17 @@ function nav(){
   const list=NAV.map(([g,items])=>`<div class="label">${g}</div>`+(g==="Components"?comps:items.map(([id,l])=>nrow(id,l,meta(id))).join(""))).join("");
   const opts=NAV.map(([g,items])=>g==="Components"?`<optgroup label="Components"><option value="library"${S.sec==="library"?" selected":""}>All components</option></optgroup>`+CATS.map(([c,cl])=>`<optgroup label="${cl}">${REG_ORDER.filter(id=>REG[id].cat===c).map(id=>`<option value="${id}"${S.sec===id?" selected":""}>${esc(REG[id].name)}</option>`).join("")}</optgroup>`).join(""):`<optgroup label="${g}">${items.map(([id,l])=>`<option value="${id}"${S.sec===id?" selected":""}>${l}</option>`).join("")}</optgroup>`).join("");
   let dt,ds;
-  if(!ch){dt="Your draft matches what is live.";ds="Any change you make starts a new draft. Nothing changes in apps until you publish.";}
-  else if(k.block){dt=`Draft: ${ch} change${ch>1?"s":""}`;ds=`${k.block} problem${k.block>1?"s":""} must be fixed before you can publish.`;}
-  else {dt=`Draft: ${ch} change${ch>1?"s":""}`;ds="Every check passes. You can publish when you are ready.";}
+  const P=S.proposal, pr=P?(P.number?`Proposal #${P.number}`:"Your proposal"):"";
+  if(!ch){dt=P?`${pr} is ${P.state==="in review"?"in review":"a draft"}.`:"No edits. Live is the newest version.";ds=P?"Every edit is in it. Edit anything to add more.":"Edit anything to start. Nothing changes in apps until a proposal lands.";}
+  else if(k.block){dt=`${ch} edit${ch>1?"s":""} not in a proposal yet`;ds=`${k.block} problem${k.block>1?"s":""} must be fixed before you can add ${ch>1?"them":"it"}.`;}
+  else {dt=`${ch} edit${ch>1?"s":""} not in a proposal yet`;ds=P?`Add ${ch>1?"them":"it"} to ${pr.toLowerCase()} when you are ready.`:"Add them to a proposal when you are ready. Your edits are saved here until then.";}
   return `<nav class="nav" aria-label="Sections"><div class="navsel"><label class="label" for="navsel" style="display:block;margin-bottom:4px">Section</label><select id="navsel" class="sel">${opts}</select></div>
     <div class="navlist">${figNavButton()}${list}</div>
-    <div class="draftbox"><div class="dt">${dt}</div>${canEdit()?`<div class="btns">${btn("Review and publish","go",{p:1,s:1,data:{s:"publish"},dis:!ch})}</div>`:""}<div class="under">${ds}</div><div class="under" id="savenote" aria-live="polite"></div></div></nav>`;
+    <div class="draftbox"><div class="dt">${dt}</div>${canEdit()?`<div class="btns">${btn(P?"Open the proposal":"Add to a proposal","go",{p:1,s:1,data:{s:"proposal"},dis:!ch&&!P})}</div>`:""}<div class="under">${ds}</div><div class="under" id="savenote" aria-live="polite"></div></div></nav>`;
 }
 function topbar(){
   return `<div class="top"><div style="display:flex;align-items:center;gap:12px;min-width:0"><div class="gbadge" style="width:26px;height:26px;border-radius:7px;background:conic-gradient(${brands().map((b,i)=>`${S.draft.brands[b.id].primary} ${i*100/brands().length}% ${(i+1)*100/brands().length}%`).join(",")})"></div><div class="t">Brand Console</div><div class="v hide-s">Design system for ${brands().length} brand${brands().length>1?"s":""}</div></div>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">${S.me?`<span class="who hide-s" title="Signed in as ${esc(S.me.email)}">${esc(S.me.name||S.me.email)}</span>`:""}${S.offline?"":`<a class="sblink hide-s" href="${esc(S.storybook)}" target="_blank" rel="noopener">Open Storybook</a>`}<span class="pill ok">Live: v${S.published.version}</span>${changes().length?`<span class="pill warn hide-s">Draft open</span>`:""}</div></div>`;
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">${S.me?`<span class="who hide-s" title="Signed in as ${esc(S.me.email)}">${esc(S.me.name||S.me.email)}</span>`:""}${S.offline?"":`<a class="sblink hide-s" href="${esc(S.storybook)}" target="_blank" rel="noopener">Open Storybook</a>`}<span class="pill ok">Live: v${S.published.version}</span>${S.proposal?(S.proposal.url?`<a class="pill ${S.proposal.state==="in review"?"warn":"neutral"} hide-s" href="${esc(S.proposal.url)}" target="_blank" rel="noopener">${S.proposal.state==="in review"?"In review":"Draft proposal"}: #${S.proposal.number}</a>`:`<span class="pill neutral hide-s">Draft proposal</span>`):""}${changes().length?`<span class="pill warn hide-s">Draft edits</span>`:""}</div></div>`;
 }
 
 /* =====================================================================
@@ -154,7 +160,7 @@ function frame(st,kind,extra=""){const u=S.ui;const inner=kind==="screen"?(u.ctx
 function realOn(){return S.ui.src==="real"&&!!STORY[S.sec]&&!S.offline;}
 function preview(kind){
   const st=pvState(), u=S.ui;
-  const note=S.preview?`<div class="pvnote">${gbadge(20)}<span style="flex-grow:1;min-width:0">You are looking at the guide's idea. It is not in your draft yet.</span><span class="btns">${canEdit()?btn("Add to my draft","applyProp",{p:1,s:1,data:{id:S.preview}}):""}<button class="btn s" data-a="unpreview">Show my draft</button></span></div>`:"";
+  const note=S.preview?`<div class="pvnote">${gbadge(20)}<span style="flex-grow:1;min-width:0">You are looking at the guide's idea. It is not in your edits yet.</span><span class="btns">${canEdit()?btn("Add to my edits","applyProp",{p:1,s:1,data:{id:S.preview}}):""}<button class="btn s" data-a="unpreview">Show my draft</button></span></div>`:"";
   let body;
   if(realOn()&&STORY[kind]) body=storyFrame(kind);
   else {
@@ -166,7 +172,7 @@ function preview(kind){
     if(!Object.hasOwn(base.brands,u.brand)) body=`<div class="ba-tags"><span class="ba-tag">${esc(bn(u.brand))} is new. ${useLast?"It was not there before your last change.":`It is not in live version ${S.published.version} yet.`}</span></div>${frame(st,kind)}`;
     else body=`<div class="ba-tags"><span class="ba-tag">${I.chevL} ${left}</span><span class="ba-tag">${right} ${I.chevR}</span></div><div class="ba" id="ba" style="--pos:${u.baPos}%"><div class="ba-l">${frame(base,kind)}</div><div class="ba-r">${frame(st,kind)}</div><div class="ba-line" aria-hidden="true"><span>${I.chevL}${I.chevR}</span></div></div>
       <div class="ba-ctl"><label for="baslider" class="under">Drag the line, or use this slider, to compare.</label><input type="range" id="baslider" min="0" max="100" value="${u.baPos}" aria-label="Move the line between before and after"></div>
-      ${u.baBase==="last"&&!S.beforeLast?`<p class="under" style="margin-top:8px">Make a change on any page to compare it here. Until then, this shows the live version on the left.</p>`:(!useLast&&!n)?`<p class="under" style="margin-top:8px">Your draft has no changes yet, so both sides look the same.</p>`:""}`;
+      ${u.baBase==="last"&&!S.beforeLast?`<p class="under" style="margin-top:8px">Make a change on any page to compare it here. Until then, this shows the live version on the left.</p>`:(!useLast&&!n)?`<p class="under" style="margin-top:8px">You have no edits yet, so both sides look the same.</p>`:""}`;
   }
   return `<div class="pvcol" id="pvcol">${pvControls()}<div class="pvbody" id="pvbody"><div class="reachwrap"><div class="reach" id="reach" aria-live="polite"></div></div>${note}${body}<div class="pickbox" id="pickbox" hidden><span></span></div></div></div>`;
 }
@@ -633,55 +639,67 @@ function ckItem(x){
 function secChecks(){
   const cs=checks(),k=counts();
   const inner=`${head("Release","Checks","These checks run every time anything changes. They cover both brands, both screen types, and both text sizes.")}
-    <div class="stats"><div class="stat ${k.block?"bad":"ok"}"><div class="n">${k.block}</div><div class="l">Must fix before publishing</div></div><div class="stat ${k.warn?"warn":"ok"}"><div class="n">${k.warn}</div><div class="l">Could be better</div></div><div class="stat ok"><div class="n">${k.pass}</div><div class="l">Passing</div></div></div>
+    <div class="stats"><div class="stat ${k.block?"bad":"ok"}"><div class="n">${k.block}</div><div class="l">Must fix before a proposal</div></div><div class="stat ${k.warn?"warn":"ok"}"><div class="n">${k.warn}</div><div class="l">Could be better</div></div><div class="stat ok"><div class="n">${k.pass}</div><div class="l">Passing</div></div></div>
     ${k.block?`<div class="label" style="margin-top:4px">Must fix</div>${cs.filter(x=>x.level==="block").map(ckItem).join("")}`:""}
     ${k.warn?`<div class="label" style="margin-top:4px">Could be better</div>${cs.filter(x=>x.level==="warn").map(ckItem).join("")}`:""}
     <div class="label" style="margin-top:4px">Passing</div>${cs.filter(x=>x.level==="pass").map(ckItem).join("")}`;
   return `<div class="page narrow">${inner}</div>`;
 }
-function releaseNote(chs){
+/* A short note for a change, made from its edits. The person can change it. */
+function changeNote(chs){
   if(!chs.length) return "";
-  const parts=chs.map(c=>{const l=labelFor(c.path);
-    if(/^brands\.[^.]+$/.test(c.path)) return c.to===undefined?`We removed the ${c.from} brand.`:`We added the ${c.to} brand.`;
-    if(c.path==="brandOrder") return `The brand order is now ${c.to}. ${c.to.split(", ")[0]} is the default.`;
-    if(/^brands\.[^.]+\.name$/.test(c.path)) return `We renamed ${c.from} to ${c.to}.`;
-    if(c.path.startsWith("guidance")) return `We updated the ${l.replace("AI guidance for ","AI guidance for the ")}.`;
-    const to=typeof c.to==="string"&&c.to.startsWith("#")?c.to:(c.path.endsWith("radius")&&RADII[c.to])?RADII[c.to].toLowerCase():ROLE_LABEL[c.to]?ROLE_LABEL[c.to].toLowerCase():c.to;
-    const ll=brands().some(b=>l.startsWith(b.name))?l:l.charAt(0).toLowerCase()+l.slice(1);
-    if(c.path.endsWith(".palette")) return `The ${ll} is now the official brand set, with ${String(c.to).toLowerCase()}.`;
-    return `The ${ll} is now ${to}.`;});
-  const why=chs.some(c=>c.path==="type.body"&&c.to==="Atkinson Hyperlegible")?" Atkinson Hyperlegible makes letters that look alike easier to tell apart.":"";
-  return `This update makes ${chs.length} change${chs.length>1?"s":""}. ${parts.join(" ")}${why}`;
+  const l=c=>{const x=labelFor(c.path);return brands().some(b=>x.startsWith(b.name))?x:x.charAt(0).toLowerCase()+x.slice(1);};
+  if(chs.some(c=>/^brands\.[^.]+$/.test(c.path))){const c=chs.find(c=>/^brands\.[^.]+$/.test(c.path));return c.to===undefined?`Remove the ${c.from} brand`:`Add the ${c.to} brand`;}
+  if(chs.length===1) return `Change the ${l(chs[0])}`;
+  const names=chs.slice(0,3).map(l).join(", ");
+  return `Change the ${names}${chs.length>3?`, and ${chs.length-3} more`:""}`.slice(0,140);
 }
-function secPublish(){
-  const chs=changes(),k=counts(),sug=chs.length?bumpFor(S.published,S.draft):{bump:"minor",why:""},bump=BUMPS.includes(S.ui.bump)?S.ui.bump:sug.bump,nv=nextVer(S.published.version,bump);
-  if(S.ui.publishNote===null||S.ui.publishNoteFor!==JSON.stringify(chs)){S.ui.publishNote=releaseNote(chs);S.ui.publishNoteFor=JSON.stringify(chs);}
-  if(!chs.length) return `<div class="page narrow">${head("Release","Review and publish")}${gnote("Your draft matches what is live right now.","Make a change in any section and it will show up here.")}</div>`;
-  const list=chs.map(c=>`<tr><td>${esc(labelFor(c.path))}</td><td class="num">${showVal(c.path,c.from)}</td><td class="num">${showVal(c.path,c.to)}</td><td>${canEdit()?`<button class="btn s" data-a="undo" data-p="${esc(c.path)}">Undo</button>`:""}</td></tr>`).join("");
-  const inner=`${head("Release","Review and publish",`Publishing makes version ${nv}. Apps that load the live theme get it right away. Nobody on your team needs to approve it, and you can roll it back at any time.`)}
-    <div class="box"><div class="bt">What changes</div><div class="tw"><table class="t"><thead><tr><th>Setting</th><th>Now</th><th>After</th><th></th></tr></thead><tbody>${list}</tbody></table></div></div>
-    <div class="box"><div class="bt">Checks</div>${k.block?cs(k):`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="pill ok">${I.check("#2F6E5C",10)} Every must-pass check passes</span>${k.warn?`<span class="pill warn">${k.warn} tip${k.warn>1?"s":""} you can look at later</span>`:""}</div>`}</div>
-    <div class="box"><div class="bt">Kind of update</div><div class="bs">The version number tells engineers how careful to be when they update.</div>
-      <div class="field"><span class="fl">This update is</span>${seg("ui.bump",bump,[["patch",`A fix, ${nextVer(S.published.version,"patch")}`],["minor",`New things, ${nextVer(S.published.version,"minor")}`],["major",`A big change, ${nextVer(S.published.version,"major")}`]],{label:"Kind of update",dis:!canEdit()})}
-        <span class="hint">${bump===sug.bump?"I picked this from your changes. ":`I suggested ${sug.bump==="patch"?"a fix":sug.bump==="minor"?"new things":"a big change"}. `}${esc(sug.why)}</span>
-        <span class="hint">A fix changes values only. New things add something without taking anything away. A big change removes or renames something apps use, so apps may need work.</span></div></div>
-    <div class="box"><div class="bt">Note for engineers and designers</div><div class="bs">I wrote this from your changes. Edit it however you like. It goes out with the new version.</div>
-      <textarea class="inp" id="relnote" data-ui="publishNote" rows="4">${esc(S.ui.publishNote)}</textarea></div>
-    <div class="box"><div class="bt">Where it goes</div><div class="tw"><table class="t"><tbody>
-      <tr><td>Web apps</td><td>They load the live theme file, so they update on their next page load. Apps that pin a version update when an engineer bumps the package.</td></tr>
-      <tr><td>Figma</td><td>Designers get a message that the library has an update.</td></tr>
-      <tr><td>AI tools</td><td>Storybook serves the new tokens and guidance to AI tools.</td></tr></tbody></table></div></div>
-    ${canEdit()?`<div style="display:flex;flex-direction:column;gap:6px"><div class="btns">${btn("Publish version "+nv,"publish",{p:1,dis:!!k.block})}${btn("Keep editing","go",{data:{s:"color"}})}</div><div class="under">${k.block?`You need to fix ${k.block} problem${k.block>1?"s":""} first. Open Checks to see ${k.block>1?"them":"it"}.`:"Your admin team will see this in the change log. They can flag it if something looks wrong."}</div></div>`:""}`;
-  function cs(k){return `<div class="ck block"><span class="dotc" style="background:var(--red)"></span><div class="body"><div class="tt">${k.block} problem${k.block>1?"s":""} must be fixed first.</div><div class="dd">${esc(checks().filter(x=>x.level==="block").map(x=>x.title).join(" "))}</div><div class="btns">${btn("Open checks","go",{s:1,data:{s:"checks"}})}</div></div></div>`;}
-  return `<div class="page narrow">${inner}</div>`;
+const KIND={patch:"A fix",minor:"New things",major:"A big change"};
+function proposalBox(){
+  const P=S.proposal; if(!P) return "";
+  const nv=nextVer(S.published.version,P.bump), conf=S.ui.confirmWithdraw;
+  const links=[P.url?`<a href="${esc(P.url)}" target="_blank" rel="noopener">Open pull request #${P.number}</a>`:"",P.preview?`<a href="${esc(P.preview)}" target="_blank" rel="noopener">Its Storybook</a>`:""].filter(Boolean).join(" · ");
+  const list=P.changes.map((c,i)=>`<li class="pchange"><div class="cn"><b>${esc(c.note)}</b><span>${KIND[c.bump]} · ${esc(c.who)} · ${esc(fmtDate(String(c.at).slice(0,10)))}</span></div>${canEdit()?btn("Undo this change","undoChange",{s:1,data:{i}}):""}</li>`).join("");
+  const state=P.state==="in review"?`<span class="pill warn">In review</span>`:`<span class="pill neutral">Draft</span>`;
+  const what=P.state==="in review"?"Reviewers can see it now. You can still add changes, for example to answer their comments.":P.number?"It is a draft pull request. Reviewers are not asked to look until you submit it.":"It is saved as a branch. The pull request opens when you submit it.";
+  return `<div class="box"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div class="bt" style="flex-grow:1">${P.number?`Proposal #${P.number}`:"Your proposal"}: ${esc(P.title)}</div>${state}</div>
+    <div class="bs">${what} When it lands, it becomes version <b>${nv}</b> (${KIND[P.bump].toLowerCase()}).${links?`<br>${links}`:""}</div>
+    <ol class="pchanges">${list}</ol>
+    ${canEdit()?(conf?`<div class="confirm"><div style="font-size:13px;font-weight:700">Withdraw this proposal?</div><div class="under" style="color:var(--ink)">The pull request closes and its branch is deleted. Your edits stay here, so you can propose them again.</div><div class="btns">${btn("Withdraw it","withdraw",{p:1,s:1})}${btn("Keep it","withdrawCancel",{s:1})}</div></div>`
+      :`<div class="btns">${P.state!=="in review"?btn("Submit for review","submitProposal",{p:1,s:1}):""}${btn("Withdraw","withdrawAsk",{s:1})}</div>`):""}</div>`;
+}
+function noticeBox(){
+  const N=S.notice; if(!N) return "";
+  const which=N.number?`Proposal #${N.number}`:"Your proposal";
+  const body=N.kind==="landed"?`${which}, "${esc(N.title)}", landed. The design system releases the new version on its own. It shows here as live when the release finishes, in a few minutes.`:`${which}, "${esc(N.title)}", was withdrawn. Its edits are still here, so you can propose them again.`;
+  return `<div class="box"><div style="display:flex;gap:10px;align-items:flex-start"><span class="pill ${N.kind==="landed"?"ok":"neutral"}">${N.kind==="landed"?"Landed":"Withdrawn"}</span><div class="bs" style="flex-grow:1;margin:0">${body}</div>${btn("Dismiss","dismissNotice",{s:1})}</div></div>`;
+}
+function secProposal(){
+  const chs=changes(),k=counts(),P=S.proposal,base=baseState();
+  const sug=chs.length?bumpFor(base,S.draft):{bump:"patch",why:""},bump=BUMPS.includes(S.ui.bump)?S.ui.bump:sug.bump;
+  if(S.ui.changeNote===undefined||S.ui.changeNoteFor!==JSON.stringify(chs)){S.ui.changeNote=S.ui.undoNote||changeNote(chs);S.ui.changeNoteFor=JSON.stringify(chs);S.ui.undoNote=null;}
+  const intro=P?"Each change you add is one step in the proposal. Reviewers see them all on GitHub, with a Storybook of the result. When they approve it and it lands, the design system releases a new version on its own.":"Your edits are saved here. When they are ready, add them to a proposal with a short note. The proposal becomes a pull request to the design system. When it is approved and lands, the design system releases a new version on its own.";
+  const rows=chs.map(c=>`<tr><td>${esc(labelFor(c.path))}</td><td class="num">${showVal(c.path,c.from)}</td><td class="num">${showVal(c.path,c.to)}</td><td>${canEdit()?`<button class="btn s" data-a="undo" data-p="${esc(c.path)}">Undo</button>`:""}</td></tr>`).join("");
+  const edits=chs.length?`<div class="box"><div class="bt">${P?"Edits not in the proposal yet":"Your edits"}</div><div class="tw"><table class="t"><thead><tr><th>Setting</th><th>${P?"In the proposal":"Live"}</th><th>Now</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`
+    :`<div class="box"><div class="bt">${P?"Edits not in the proposal yet":"Your edits"}</div><div class="bs">${P?"None. Everything you edited is in the proposal.":"None yet. Edit anything in the console, and it shows up here."}</div></div>`;
+  const checksBox=k.block?`<div class="ck block"><span class="dotc" style="background:var(--red)"></span><div class="body"><div class="tt">${k.block} problem${k.block>1?"s":""} must be fixed first.</div><div class="dd">${esc(checks().filter(x=>x.level==="block").map(x=>x.title).join(" "))}</div><div class="btns">${btn("Open checks","go",{s:1,data:{s:"checks"}})}</div></div></div>`:"";
+  const form=chs.length&&canEdit()?`<div class="box"><div class="bt">${P?"Add a change":"Start a proposal"}</div><div class="bs">${P?"These edits become one more change in the proposal.":"These edits become its first change. You can add more changes, and submit it for review when it is ready."}</div>
+      ${checksBox}
+      <div class="field"><label class="fl" for="chnote">What this change does</label><textarea class="inp" id="chnote" data-ui="changeNote" rows="2" maxlength="300">${esc(S.ui.changeNote||"")}</textarea><span class="hint">Reviewers and engineers read this. It goes into the release notes.</span></div>
+      <div class="field"><span class="fl">This change is</span>${seg("ui.bump",bump,[["patch","A fix"],["minor","New things"],["major","A big change"]],{label:"Kind of change"})}
+        <span class="hint">${bump===sug.bump?"I picked this from your edits. ":`I suggested ${KIND[sug.bump].toLowerCase()}. `}${esc(sug.why)}</span>
+        <span class="hint">A fix changes values only. New things add something without taking anything away. A big change removes or renames something apps use, so apps may need work. The biggest change in a proposal decides its version.</span></div>
+      <div class="btns">${btn(P?"Add to the proposal":"Start the proposal","addChange",{p:1,dis:!!k.block})}</div></div>`:"";
+  return `<div class="page narrow">${head("Release","Proposal",intro)}${noticeBox()}${proposalBox()}${edits}${form}</div>`;
 }
 function secHistory(){
-  const inner=`${head("Release","Versions","Every publish makes a new version. Rolling back also makes a new version, so nothing is ever lost.")}
+  const inner=`${head("Release","Versions","Each version is released by the design system when a proposal lands. To go back to an earlier version, roll back: your edits become that version, and it reaches apps when you add it to a proposal and it lands.")}
+    ${S.history.length?"":gnote("No versions are released yet.","The first proposal that lands becomes version 1.0.0.")}
     ${S.history.map((h,i)=>{
-      const live=i===0; const cf=S.ui.confirmRb===h.v;
-      return `<div class="ver${live?" live":""}"><div class="vn">v${h.v}</div><div class="body"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${live?`<span class="pill ok">Live now</span>`:""}${h.flag?`<span class="pill warn">Flagged for review</span>`:""}${h.rb?`<span class="pill neutral">Roll back</span>`:""}<span class="meta">${esc(h.date)} · ${esc(h.who)}</span></div><div class="note">${esc(h.note)}</div>
-        ${cf?`<div class="confirm"><div style="font-size:13px;font-weight:700">Make version ${h.v} live again?</div><div class="under" style="color:var(--ink)">All apps that load the live theme will switch back. Your open draft will stay as it is.</div><div class="btns">${btn("Roll back to "+h.v,"doRb",{p:1,s:1,data:{v:h.v}})}${btn("Cancel","cancelRb",{s:1})}</div></div>`
-        :`<div class="btns">${!live&&canEdit()?btn("Roll back to this version","askRb",{s:1,data:{v:h.v}}):""}${h.flag?btn("Clear the flag","flag",{s:1,data:{v:h.v}}):btn("Flag for review","flag",{s:1,data:{v:h.v}})}</div>`}</div></div>`;}).join("")}`;
+      const live=h.v===S.published.version, cf=S.ui.confirmRb===h.v;
+      return `<div class="ver${live?" live":""}"><div class="vn">v${h.v}</div><div class="body"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${live?`<span class="pill ok">Live now</span>`:""}<span class="meta">${esc(h.date)}</span>${h.url?`<a class="meta" href="${esc(h.url)}" target="_blank" rel="noopener">Release notes</a>`:""}</div><div class="note">${esc(h.note.replace(/^#+ .*$/gm,"").replace(/^- /gm,"").trim())}</div>
+        ${cf?`<div class="confirm"><div style="font-size:13px;font-weight:700">Make your edits version ${h.v}?</div><div class="under" style="color:var(--ink)">Your edits become version ${h.v}, and any edits you made on top of the live version stay. Nothing changes in apps until you add it to a proposal and it lands.</div><div class="btns">${btn("Roll back to "+h.v,"doRb",{p:1,s:1,data:{v:h.v}})}${btn("Cancel","cancelRb",{s:1})}</div></div>`
+        :`<div class="btns">${!live&&canEdit()?btn("Roll back to this version","askRb",{s:1,data:{v:h.v}}):""}</div>`}</div></div>`;}).join("")}`;
   return `<div class="page narrow">${inner}</div>`;
 }
 
@@ -696,7 +714,7 @@ function fileText(st,name){const f=files(st,st.version||S.published.version)[nam
 function secExport(){
   const st=clone(S.published), names=Object.keys(files(st)), cur=names.includes(S.ui.exportFile)?S.ui.exportFile:"theme.css";
   const txt=fileText(st,cur);
-  const inner=`${head("Release","Use it in apps and Figma",`Everything below is made from the live version, v${S.published.version}. Your draft is not included until you publish.`)}
+  const inner=`${head("Release","Use it in apps and Figma",`Everything below is made from the live version, v${S.published.version}. Your edits are not in it until they land in a new version.`)}
     <div class="steps3">
       <div class="step"><div class="sn">1</div><div class="st">Engineers</div><div class="sd">Apps import <span class="tok">theme.css</span>. It uses the same names as shadcn, so the components you already have pick up the brand. To switch brands, change one word on the page: <span class="tok">data-brand</span>.</div></div>
       <div class="step"><div class="sn">2</div><div class="st">Designers in Figma</div><div class="sd">In Figma, open Local variables and choose Import, then pick the files in the tokens folder. A full Figma setup, with brand and screen modes, comes in the next phase.</div></div>
@@ -739,7 +757,7 @@ function figRow(r){const opts=figOptions(r),p=figPickOf(r),[cls,txt]=FIG_ST[r.st
 function figReview(){const F=S.fig;if(!F.rows)return "";
   const diff=F.rows.filter(r=>r.status!=="same"),open=diff.filter(r=>figPickOf(r)===null).length;
   const toFig=diff.filter(r=>figPickOf(r)==="console").length,toHere=diff.filter(r=>figPickOf(r)==="figma").length;
-  if(!diff.length&&!(F.extras&&(F.extras.colors.length||F.extras.fonts.length))) return `<div class="box"><div class="bt">Everything matches</div><div class="bs">Figma and your draft have the same ${F.rows.length} values. There is nothing to sync.</div></div>`;
+  if(!diff.length&&!(F.extras&&(F.extras.colors.length||F.extras.fonts.length))) return `<div class="box"><div class="bt">Everything matches</div><div class="bs">Figma and your edits have the same ${F.rows.length} values. There is nothing to sync.</div></div>`;
   const groups=FIG_COLLS.map(c=>{const rs=diff.filter(r=>r.coll===c.id);if(!rs.length)return "";
     const quiet=rs.filter(r=>r.status==="new"||r.status==="fixed"),loud=rs.filter(r=>!quiet.includes(r)),show=(F.show||{})[c.id];
     return `<div class="figgrp"><div class="label">${esc(c.name)}</div>${loud.map(figRow).join("")}
@@ -756,7 +774,7 @@ function figReview(){const F=S.fig;if(!F.rows)return "";
     ${diff.some(r=>figOptions(r).some(o=>o[0]==="figma"))?`<div class="btns" style="margin-bottom:6px">${btn("Use Figma's for all","figAll",{s:1,data:{v:"figma"}})}${btn("Keep the console's for all","figAll",{s:1,data:{v:"console"}})}</div>`:""}
     ${groups}${extras}
     <div class="figgo"><div class="btns">${btn(label,"figApply",{p:1,dis:!!open||F.busy})}${btn("Cancel","figCancel",{s:1})}</div>
-      <div class="under" aria-live="polite">${open?`Pick for ${open} more thing${open>1?"s":""} first.`:F.source==="files"?`This changes ${toHere} thing${toHere===1?"":"s"} in your draft. Then you download new files for Figma.`:`This sends ${toFig} value${toFig===1?"":"s"} to Figma and changes ${toHere} thing${toHere===1?"":"s"} in your draft.`}</div></div></div>`;}
+      <div class="under" aria-live="polite">${open?`Pick for ${open} more thing${open>1?"s":""} first.`:F.source==="files"?`This changes ${toHere} thing${toHere===1?"":"s"} in your edits. Then you download new files for Figma.`:`This sends ${toFig} value${toFig===1?"":"s"} to Figma and changes ${toHere} thing${toHere===1?"":"s"} in your draft.`}</div></div></div>`;}
 function secFigma(){
   S.fig=S.fig||{};const f=S.figma||{},F=S.fig,ed=canEdit();
   const steps=`<ol class="figsteps"><li>In Figma, open the menu at the top left, then <b>Settings</b>, then the <b>Security</b> tab.</li><li>Under <b>Personal access tokens</b>, pick <b>Generate new token</b>.</li><li>Give it access to <b>File content: read</b> and <b>Variables: read and write</b>.</li><li>Copy the token and paste it here. ${S.shared?"The console keeps it on the team's server, and never sends it to anyone's browser.":"The console keeps it in the .env file on this computer only."} It never goes into your design system files.</li></ol>`;
@@ -765,7 +783,7 @@ function secFigma(){
   if(S.offline) top=`<div class="box"><div class="bt">Your Figma library</div><div class="bs">The live connection to Figma works in the local version on your computer. In this prototype, you can save the link and sync with files.</div>
     <div class="field"><label class="fl" for="fig-link">Figma file link</label><input class="inp" id="fig-link" data-figui="link" value="${esc(F.link??f.fileUrl??"")}" placeholder="https://www.figma.com/design/…"></div>
     <div style="display:flex;flex-direction:column;gap:6px"><div class="btns">${btn("Save the link","figLink",{p:1,s:1})}</div><div class="under">After you save it, Open in Figma shows at the top of the left column.</div></div></div>`;
-  else if(!f.connected) top=`<div class="box"><div class="bt">Connect your Figma library</div><div class="bs">The console reads your library's variables and styles, compares them with your draft, and sends changes both ways.${f.fileUrl?` Your link is saved, so Open in Figma already works.`:""}</div>
+  else if(!f.connected) top=`<div class="box"><div class="bt">Connect your Figma library</div><div class="bs">The console reads your library's variables and styles, compares them with your edits, and sends changes both ways.${f.fileUrl?` Your link is saved, so Open in Figma already works.`:""}</div>
     ${ed?`<div class="field"><label class="fl" for="fig-link">Figma file link</label><input class="inp" id="fig-link" data-figui="link" value="${esc(F.link??f.fileUrl??"")}" placeholder="https://www.figma.com/design/…" autocomplete="off"><span class="hint">In Figma, pick Share, then Copy link.</span></div>
     <div class="field"><label class="fl" for="fig-token">Figma access token</label><input class="inp" id="fig-token" data-figui="token" type="password" value="${esc(F.token||"")}" autocomplete="off" spellcheck="false" placeholder="${f.hasToken?"A token is saved. Paste a new one to replace it.":"figd_…"}"><span class="hint">How to make a token:</span>${steps}</div>
     <div style="display:flex;flex-direction:column;gap:6px"><div class="btns">${btn("Connect to Figma","figConnect",{p:1,dis:!!F.busy})}${btn("Save the link only","figLink",{s:1})}</div><div class="under" aria-live="polite">${F.busy==="connect"?"Checking the file with Figma…":"Figma lets other tools read and change variables only on its Enterprise plan. On other plans, the link still works, and you can sync with files below."}</div></div>`:`<p class="under">The brand team or the admin team connects Figma.</p>`}${err}</div>`;
@@ -779,7 +797,7 @@ function secFigma(){
     ${F.files&&F.files.some(x=>!x.coll||!x.mode)?`<div class="field"><span class="fl">Tell me what these files are</span>${F.files.map((x,i)=>x.coll&&x.mode?"":`<div class="figfile"><span>${esc(x.name)}</span><select class="sel" data-figfile="${i}" data-k="coll" aria-label="Collection for ${esc(x.name)}"><option value="">Pick a collection</option>${FIG_COLLS.map(c=>`<option value="${c.id}"${x.coll===c.id?" selected":""}>${esc(c.name)}</option>`).join("")}</select>${x.coll?`<select class="sel" data-figfile="${i}" data-k="mode" aria-label="Mode for ${esc(x.name)}"><option value="">Pick a mode</option>${figModes(x.coll).map(m=>`<option${x.mode===m?" selected":""}>${esc(m)}</option>`).join("")}</select>`:""}</div>`).join("")}<div class="btns">${btn("Compare these files","figFilesCompare",{s:1})}</div></div>`:""}
     ${F.outFiles?`<div style="display:flex;flex-direction:column;gap:6px"><div class="btns">${btn("Download the updated files for Figma","figDownloadOut",{p:1,s:1})}</div><div class="under">Import them in Figma so both sides match.</div></div>`:""}</div>`;
   const inner=`${head("Figma","Sync with Figma","Either side can change anything. When both change the same thing, you pick which one to keep.")}
-    ${gnote("Designers can keep the detailed work in Figma. The console keeps the checks, so anything that comes in from Figma is checked for older readers before you publish.","Nothing changes until you review the differences and pick Sync now.")}
+    ${gnote("Designers can keep the detailed work in Figma. The console keeps the checks, so anything that comes in from Figma is checked for older readers before it goes into a proposal.","Nothing changes until you review the differences and pick Sync now.")}
     ${top}${figReview()}${filesBox}
     <div class="box"><div class="bt">What syncs</div><div class="tw"><table class="t"><thead><tr><th>Figma collection</th><th>Modes</th><th>What is in it</th></tr></thead><tbody>${FIG_COLLS.map(c=>`<tr><td>${esc(c.name)}</td><td>${figModes(c.id).join(", ")}</td><td>${esc(c.desc.replace(/ Made by the Brand Console\.$/,""))}</td></tr>`).join("")}</tbody></table></div>
       <p class="under">Theme colors that the console makes from other colors always come from the console. Spacing comes from Figma only when the admin team syncs. Component guidance stays in the console.</p></div>`;
@@ -818,16 +836,16 @@ const SUGG={
 function msgHTML(m){
   if(m.who==="me") return `<div class="msg me"><div class="me-av">MR</div><div class="body"><div class="who">You${m.voice?" · spoken":""}</div><div class="bub">${esc(m.x)}</div></div></div>`;
   const p=m.prop&&S.props[m.prop];
-  return `<div class="msg">${gbadge(24)}<div class="body"><div class="who">Guide</div><div class="bub">${m.thinking?`<span class="think"><i></i><i></i><i></i></span> Thinking about your draft`:esc(m.x)}</div>${p?propHTML(p):""}${m.thinking?`<div class="btns" style="margin-top:6px">${btn("Stop","stopAsk",{s:1})}</div>`:""}</div></div>`;
+  return `<div class="msg">${gbadge(24)}<div class="body"><div class="who">Guide</div><div class="bub">${m.thinking?`<span class="think"><i></i><i></i><i></i></span> Thinking about your edits`:esc(m.x)}</div>${p?propHTML(p):""}${m.thinking?`<div class="btns" style="margin-top:6px">${btn("Stop","stopAsk",{s:1})}</div>`:""}</div></div>`;
 }
 function propHTML(p){
   const after=applyCh(S.draft,p.changes), k0=counts(), cs=runChecks(after), kb=cs.filter(x=>x.level==="block").length;
   const ok=kb<=k0.block;
   let status;
-  if(p.state==="applied") status=`Added to your draft. You can undo it on the Review and publish page.`;
+  if(p.state==="applied") status=`Added to your edits. You can undo it on the Proposal page.`;
   else if(p.state==="dismissed") status=`You said no to this idea.`;
   else status=kb?`With this idea, ${kb} check${kb>1?"s":""} would still fail.`:`With this idea, every must-pass check passes.`;
-  const acts=p.state==="open"&&canEdit()?`<div class="btns">${btn("Add to my draft","applyProp",{p:1,s:1,data:{id:p.id}})}${btn(S.preview===p.id?"Stop showing":"Show me first","previewProp",{s:1,data:{id:p.id}})}${btn("No thanks","dismissProp",{s:1,data:{id:p.id}})}</div>`:"";
+  const acts=p.state==="open"&&canEdit()?`<div class="btns">${btn("Add to my edits","applyProp",{p:1,s:1,data:{id:p.id}})}${btn(S.preview===p.id?"Stop showing":"Show me first","previewProp",{s:1,data:{id:p.id}})}${btn("No thanks","dismissProp",{s:1,data:{id:p.id}})}</div>`:"";
   return `<div class="prop"><div class="ph">${p.state==="applied"?"Added":"Suggested change"}</div>${p.changes.map(c=>`<div class="chg"><b>${esc(labelFor(c.path))}</b><div class="ft">${showVal(c.path,c.from)} → ${showVal(c.path,c.value)}</div>${c.why?`<div class="why">${esc(c.why)}</div>`:""}</div>`).join("")}
     ${acts}<div class="under" style="${ok||p.state!=="open"?"":"color:var(--red)"}">${status}</div></div>`;
 }
@@ -841,9 +859,9 @@ function composer(){
 function asst(){
   if(!S.ui.asst) return `<div class="asst-c"><button class="iconbtn" data-a="asstOpen" aria-label="Show the guide" title="Show the guide">${I.chevL}</button><button class="bigmic" data-a="asstOpenTalk" aria-label="Talk to the guide" title="Talk to the guide">${I.mic("#fff",18)}</button><div class="vt">Guide</div></div>`;
   const sg=(SUGG[S.sec]||SUGG._).map(s=>`<button class="chip" data-a="sugg" data-t="${esc(s)}">${esc(s)}</button>`).join("");
-  return `<aside class="asst" aria-label="Design guide"><div class="asst-head">${gbadge(28)}<div style="flex-grow:1;min-width:0"><div class="t">Design guide</div><div class="s">It can see your draft. It never publishes anything by itself.</div></div><button class="iconbtn" data-a="asstClose" aria-label="Hide the guide" title="Hide the guide">${window.innerWidth<=820?I.x:I.chevR}</button></div>
+  return `<aside class="asst" aria-label="Design guide"><div class="asst-head">${gbadge(28)}<div style="flex-grow:1;min-width:0"><div class="t">Design guide</div><div class="s">It can see your edits. It never adds anything to a proposal by itself.</div></div><button class="iconbtn" data-a="asstClose" aria-label="Hide the guide" title="Hide the guide">${window.innerWidth<=820?I.x:I.chevR}</button></div>
     <div class="asst-list" id="alist">${S.msgs.map(msgHTML).join("")}</div>
-    <div class="asst-foot"><div class="sugg">${sg}</div>${composer()}<div class="under">${S.ai.server?`The guide uses Claude (${esc(S.ai.model)}). Nothing changes until you add it to your draft.`:S.ai.live?"The guide uses Claude. Nothing changes until you add it to your draft.":S.offline?"The guide asks Claude when this page allows it. Otherwise it gives sample answers.":"The guide is using sample answers. Add a Claude API key to the .env file to connect it."} ${SR?"Tap the mic and talk. Your browser turns your words into text.":"This browser cannot turn speech into text, so the mic plays a sample."}</div></div></aside>`;
+    <div class="asst-foot"><div class="sugg">${sg}</div>${composer()}<div class="under">${S.ai.server?`The guide uses Claude (${esc(S.ai.model)}). Nothing changes until you add it to your edits.`:S.ai.live?"The guide uses Claude. Nothing changes until you add it to your edits.":S.offline?"The guide asks Claude when this page allows it. Otherwise it gives sample answers.":"The guide is using sample answers. Add a Claude API key to the .env file to connect it."} ${SR?"Tap the mic and talk. Your browser turns your words into text.":"This browser cannot turn speech into text, so the mic plays a sample."}</div></div></aside>`;
 }
 function addMsg(m){S.msgs.push(m);}
 function addProp(changes,extra={}){const id="p"+(S.nextId++);S.props[id]={id,changes:changes.map(c=>({...c,from:getP(S.draft,c.path)})),state:"open",...extra};return id;}
@@ -1008,8 +1026,9 @@ function section(){
   switch(S.sec){
     case "brands":return secBrands();case "color":return secColor();case "type":return secType();case "space":return secSpace();case "shape":return secShape();case "icons":return secIcons();
     case "library":return secLibrary();
-    case "checks":return secChecks();case "publish":return secPublish();case "history":return secHistory();case "export":return secExport();case "figma":return secFigma();}
+    case "checks":return secChecks();case "proposal":return secProposal();case "history":return secHistory();case "export":return secExport();case "figma":return secFigma();}
   if(REG[S.sec]) return secComp(S.sec);
+  S.sec="color";return secColor();
 }
 /* Fonts load from Google Fonts only when they are needed, one family at a time. */
 const LOADED_FONTS=new Set();
@@ -1134,7 +1153,7 @@ const A={
   brandDelAsk(e){S.ui.brandDel=e.dataset.b;render();},
   brandDelCancel(){S.ui.brandDel=null;render();},
   brandDel(e){if(!canEdit())return;const id=e.dataset.b,name=bn(id);
-    try{const st=removeBrand(S.draft,id);markBefore("brands");S.draft=st;S.ui.brandDel=null;render();scheduleSave();toast(`I removed ${name}. Undo it on Review and publish if you need it back.`);}catch(err){brandErr(err);}},
+    try{const st=removeBrand(S.draft,id);markBefore("brands");S.draft=st;S.ui.brandDel=null;render();scheduleSave();toast(`I removed ${name}. Undo it on the Proposal page if you need it back.`);}catch(err){brandErr(err);}},
   palStart(e){if(!canEdit())return;const b=e.dataset.b,br=S.draft.brands[b];markBefore(`brands.${b}.palette`);
     br.palette={groups:[{id:"signature",name:"Signature colors",note:"These colors are what people should know as "+bn(b)+".",colors:[{name:"Main color",hex:br.primary,share:20},{name:"Second color",hex:br.secondary,share:12}]},
       {id:"base",name:"Base",note:"The main background. It gives the other colors room to stand out.",colors:[{name:"White",hex:"#FFFFFF",share:20}]},
@@ -1166,7 +1185,7 @@ const A={
           const picks=figCleanPicks(rows,F.picks);const open=rows.filter(x=>x.status!=="same"&&(picks[x.rk]===undefined?x.pick:picks[x.rk])===null);if(open.length)throw new Error(`Pick which one to keep for ${open.length} more thing${open.length>1?"s":""} first.`);
           const r=figApply(S.draft,rows,picks);markBefore("figma");S.draft=r.state;S.figBase=figBaseAfterFiles(S.figBase,S.draft,rows,picks);out={errors:r.errors,files:figFiles(S.draft)};}
         else{out=await api("POST","/api/figma/files/apply",{files:files.map(x=>({name:x.name,json:x.json,coll:x.coll,mode:x.mode})),picks:F.picks,role:S.role});markBefore("figma");loadState(out);S.figma=out.status||S.figma;}
-        figSet({busy:null,rows:null,outFiles:out.files,done:null,error:(out.errors||[]).length?`Some values did not fit: ${out.errors.join(" ")}`:null});toast("Your draft has Figma's changes. Download the updated files for Figma next.");}
+        figSet({busy:null,rows:null,outFiles:out.files,done:null,error:(out.errors||[]).length?`Some values did not fit: ${out.errors.join(" ")}`:null});toast("Your edits have Figma's changes. Download the updated files for Figma next.");}
       catch(e){figSet({busy:null,error:e.message});}return;}
     const add=Object.entries(F.add||{}).filter(([,on])=>on).map(([i])=>({...F.extras.colors[+i],brand:F.addTo||S.ui.brand}));
     figSet({busy:"apply",error:null});
@@ -1221,7 +1240,7 @@ const A={
   palDel(e){if(!canEdit())return;const b=e.dataset.b,br=S.draft.brands[b],g=br.palette.groups[+e.dataset.g],c=g&&g.colors[+e.dataset.c];if(!c)return;
     const role=[["primary","main color"],["secondary","second color"],["accent","accent color"]].find(([k])=>normHex(br[k])===normHex(c.hex));
     if(role){toast(`${c.name} is your ${role[1]}. Pick a different ${role[1]} first, then remove it.`);return;}
-    markBefore(`brands.${b}.palette`);g.colors.splice(+e.dataset.c,1);render();scheduleSave();toast(`I removed ${c.name} from the color set. Undo it on Review and publish if you need it back.`);},
+    markBefore(`brands.${b}.palette`);g.colors.splice(+e.dataset.c,1);render();scheduleSave();toast(`I removed ${c.name} from the color set. Undo it on the Proposal page if you need it back.`);},
   go(e){S.sec=e.dataset.s;S.preview=null;S.ui.confirmRb=null;render();const sc=document.getElementById("scroller");if(sc)sc.scrollTop=0;if(window.innerWidth<=820)window.scrollTo(0,0);},
   reset(){location.reload();},
   asstOpen(){S.ui.asst=true;render();scrollChat();},
@@ -1265,25 +1284,40 @@ const A={
     setP(S.draft,"type.heading",x[1]);setP(S.draft,"type.headingStyle",x[2]);setP(S.draft,"type.ui",x[4]);setDraft("type.body",x[3]);},
   makeImg(e){const [,b,,md]=e.dataset.p.split(".");setPicture(e.dataset.p,makeBrandPicture(S.draft.brands[b],md),"A picture made from your colors");},
   cat(e){const c=e.dataset.c;const cur=REG[S.sec]&&REG[S.sec].cat;const open=S.ui.openCats[c]??(c===cur);S.ui.openCats[c]=!open;render();},
-  async publish(){
-    if(counts().block||!canEdit())return;
-    const bump=BUMPS.includes(S.ui.bump)?S.ui.bump:bumpFor(S.published,S.draft).bump;
-    if(S.offline){const v=nextVer(S.published.version,bump);S.draft.version=v;S.published=clone(S.draft);S.snaps[v]=clone(S.published);
-      S.history.unshift({v,date:fmtDate(new Date().toISOString().slice(0,10)),who:roleWho(),note:S.ui.publishNote||"Updated the design system."});
-      S.ui.publishNote=null;S.ui.bump=null;S.sec="history";render();toast(`Published version ${v}.`);return;}
-    try{await flushSave();const r=await api("POST","/api/publish",{note:S.ui.publishNote,who:roleWho(),bump});loadState(r);
-      S.ui.publishNote=null;S.ui.bump=null;S.sec="history";render();toast(`Published version ${r.version}. It is in the dist folder now.`);}
-    catch(e){toast(e.message);}},
+  async addChange(){if(!canEdit())return;const chs=changes();if(!chs.length)return;
+    const note=String(S.ui.changeNote||"").trim(),bump=BUMPS.includes(S.ui.bump)?S.ui.bump:bumpFor(baseState(),S.draft).bump;
+    if(!note){toast("Write a short note that says what this change does.");const el=document.getElementById("chnote");if(el)el.focus();return;}
+    const first=!S.proposal;
+    if(S.offline){const change={note,bump,who:roleWho(),at:new Date().toISOString(),edits:chs.map(c=>({path:c.path,before:c.path==="brandOrder"?Object.keys(baseState().brands):clone(getP(baseState(),c.path)??null)}))};
+      S.proposal=S.proposal||{number:null,url:null,preview:null,title:note,state:"draft",changes:[],bump:"patch"};
+      S.proposal.changes.push(change);S.proposal.bump=["patch","minor","major"].reduce((b,x)=>S.proposal.changes.some(c=>c.bump===x)?x:b,"patch");
+      S.base=clone(S.draft);S.ui.bump=null;S.ui.changeNote=undefined;render();toast(first?"I started the proposal. In this prototype it stays in the page.":"I added the change to the proposal.");return;}
+    try{await flushSave();const r=await api("POST","/api/proposal/add",{note,bump});loadState(r);S.ui.bump=null;S.ui.changeNote=undefined;render();
+      toast(first?(S.proposal.number?`I opened proposal #${S.proposal.number} as a draft pull request.`:"I started the proposal. Its pull request opens when you submit it."):"I added the change to the proposal.");}
+    catch(err){toast(err.message);}},
+  async submitProposal(){if(!canEdit()||!S.proposal)return;
+    if(S.offline){S.proposal.state="in review";render();toast("Submitted. In this prototype, nobody reviews it.");return;}
+    try{await flushSave();const r=await api("POST","/api/proposal/submit",{});loadState(r);render();toast(`Proposal #${S.proposal.number} is ready for review.`);}catch(err){toast(err.message);}},
+  withdrawAsk(){S.ui.confirmWithdraw=true;render();},
+  withdrawCancel(){S.ui.confirmWithdraw=false;render();},
+  async withdraw(){if(!canEdit()||!S.proposal)return;S.ui.confirmWithdraw=false;
+    if(S.offline){S.notice={kind:"withdrawn",number:null,title:S.proposal.title};S.proposal=null;S.base=null;render();toast("I withdrew the proposal. Your edits are still here.");return;}
+    try{const r=await api("POST","/api/proposal/withdraw",{});loadState(r);render();toast("I withdrew the proposal. Your edits are still here.");}catch(err){toast(err.message);}},
+  async dismissNotice(){if(S.offline){S.notice=null;render();return;}try{const r=await api("POST","/api/proposal/dismiss",{});loadState(r);render();}catch(err){S.notice=null;render();}},
+  /* Undoing a change in a proposal is a new change that puts its values back. History is never rewritten. */
+  undoChange(e){if(!canEdit()||!S.proposal)return;const c=S.proposal.changes[+e.dataset.i];if(!c)return;
+    markBefore("undo");
+    const from=clone(S.draft);for(const x of c.edits){if(x.path==="brandOrder"){const keep=x.before.filter(id=>S.draft.brands[id]),rest=Object.keys(S.draft.brands).filter(id=>!keep.includes(id));from.brands=Object.fromEntries([...keep,...rest].map(id=>[id,S.draft.brands[id]]));}else if(x.before===null){const ks=x.path.split(".");delete getP(from,ks.slice(0,-1).join("."))[ks.at(-1)];}else setP(from,x.path,clone(x.before));}
+    for(const x of c.edits){if(x.path==="brandOrder"){S.draft.brands=from.brands;continue;}if(x.before===null){const ks=x.path.split(".");const par=getP(S.draft,ks.slice(0,-1).join("."));if(par)delete par[ks.at(-1)];}else setP(S.draft,x.path,clone(x.before));}
+    S.ui.undoNote=`Undo: ${c.note}`.slice(0,300);S.ui.changeNote=undefined;S.sec="proposal";render();scheduleSave();
+    toast("The values from before that change are back, as edits. Add them to the proposal to undo it.");},
   askRb(e){S.ui.confirmRb=e.dataset.v;render();},
   cancelRb(){S.ui.confirmRb=null;render();},
   async doRb(e){const v=e.dataset.v;
-    if(S.offline){const nv=nextVer(S.published.version,"minor"),pending=diff(S.published,S.draft),snap=clone(S.snaps[v]);snap.version=nv;
-      const d=clone(snap);pending.forEach(c=>{if(c.path.endsWith(".palette"))setP(d,c.path,clone(getP(S.draft,c.path)));else setP(d,c.path,c.to);});
-      S.published=snap;S.snaps[nv]=clone(snap);S.draft=d;S.history.unshift({v:nv,date:fmtDate(new Date().toISOString().slice(0,10)),who:roleWho(),note:`Rolled back to version ${v}.`,rb:true});
-      S.ui.confirmRb=null;render();toast(`Version ${v} is live again as ${nv}.`);return;}
-    try{await flushSave();const r=await api("POST","/api/rollback",{version:v,who:roleWho()});loadState(r);S.ui.confirmRb=null;render();toast(`Version ${v} is live again as ${r.version}.`);}catch(err){toast(err.message);}},
-  async flag(e){if(S.offline){const h=S.history.find(x=>x.v===e.dataset.v);h.flag=!h.flag;render();toast(h.flag?"Flagged. Your admin team will see this in their change log.":"The flag is cleared.");return;}
-    try{const r=await api("POST","/api/flag",{version:e.dataset.v});S.history=mapHistory(r.history);render();toast(r.flag?"Flagged. Your admin team will see this in their change log.":"The flag is cleared.");}catch(err){toast(err.message);}},
+    if(S.offline){const snap=S.snaps[v];if(!snap){toast("This prototype does not have that version.");return;}const pending=diff(S.published,S.draft),d=clone(snap);d.version=S.published.version;
+      pending.forEach(c=>{if(c.path==="brandOrder")return;const x=getP(S.draft,c.path);if(x===undefined){const ks=c.path.split(".");const par=getP(d,ks.slice(0,-1).join("."));if(par)delete par[ks.at(-1)];}else setP(d,c.path,clone(x));});
+      markBefore("undo");S.draft=d;S.ui.confirmRb=null;S.sec="proposal";render();toast(`Your edits are version ${v} now. Add them to a proposal to make it live.`);return;}
+    try{await flushSave();markBefore("undo");const r=await api("POST","/api/rollback",{version:v});loadState(r);lastSaved=JSON.stringify(S.draft);S.ui.confirmRb=null;S.sec="proposal";render();toast(`Your edits are version ${v} now. Add them to a proposal to make it live.`);}catch(err){toast(err.message);}},
   file(e){S.ui.exportFile=e.dataset.f;render();},
   pickIcon(e){S.ui.icon=S.ui.icon===e.dataset.n?null:e.dataset.n;render();},
   iconGrp(e){S.ui.iconGrp=e.dataset.g;render();},
@@ -1387,7 +1421,7 @@ document.addEventListener("focusin",onEditorHover);
 window.addEventListener("resize",(()=>{let w=window.innerWidth;return()=>{const n=window.innerWidth;if((w>820)!==(n>820)){w=n;render();}w=n;};})());
 
 /* =====================================================================
-   SERVER: load, autosave, publish
+   SERVER: load, autosave, proposals
    ===================================================================== */
 async function api(method,url,body,signal){
   // redirect "manual": when the Cloudflare Access sign-in ends, Access answers with a redirect to its sign-in page,
@@ -1408,25 +1442,26 @@ function showSignedOut(){
   document.body.appendChild(el);
 }
 function fmtDate(d){const t=new Date(d+"T12:00:00");return isNaN(t)?d:t.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});}
-function mapHistory(v){return v.map(x=>({v:x.version,date:fmtDate(x.date),who:x.who,note:x.note,flag:!!x.flag,rb:!!x.rollbackOf}));}
-/* Who a publish is credited to. Online, the server records the signed-in person and ignores this. */
+function mapHistory(v){return v.map(x=>({v:x.version,date:fmtDate(x.date),note:x.note||"",url:x.url||null}));}
+/* Who a change is credited to, in the offline prototype. Online, the server records the signed-in person. */
 function roleWho(){return S.me?S.me.email:"Brand team";}
-function loadState(r){S.draft=r.draft;S.published=r.published;if(!Object.hasOwn(S.draft.brands,S.ui.brand))S.ui.brand=brandList(S.draft)[0].id;S.history=mapHistory(r.history||[]);if("ai" in r){S.ai.server=!!r.ai;S.ai.model=r.model;}if(r.storybook)S.storybook=r.storybook;if(r.figma)S.figma=r.figma;if("shared" in r)S.shared=!!r.shared;if("github" in r)S.github=r.github;if(r.me){S.me=r.me;S.role=r.me.role;}lastSaved=JSON.stringify(S.draft);S.save="saved";}
+function loadState(r){S.draft=r.draft;S.published=r.published;S.base=r.base||null;S.proposal=r.proposal||null;S.notice=r.notice||null;if(!Object.hasOwn(S.draft.brands,S.ui.brand))S.ui.brand=brandList(S.draft)[0].id;S.history=mapHistory(r.history||[]);if("ai" in r){S.ai.server=!!r.ai;S.ai.model=r.model;}if(r.storybook)S.storybook=r.storybook;if(r.figma)S.figma=r.figma;if("shared" in r)S.shared=!!r.shared;if("github" in r)S.github=r.github;if(r.me){S.me=r.me;S.role=r.me.role;}lastSaved=JSON.stringify(S.draft);S.save="saved";}
 function mergeTurns(t){const o=[];t.forEach(x=>{if(o.length&&o[o.length-1].role===x.role)o[o.length-1].content+="\n\n"+x.content;else o.push({...x});});while(o.length&&o[0].role!=="user")o.shift();return o;}
 function parseLoose(t){if(!t)return null;try{return JSON.parse(t);}catch(e){}const f=t.match(/```(?:json)?\s*([\s\S]*?)```/);if(f){try{return JSON.parse(f[1]);}catch(e){}}const a=t.indexOf("{"),b=t.lastIndexOf("}");if(a>=0&&b>a){try{return JSON.parse(t.slice(a,b+1));}catch(e){}}return null;}
 let saveT=null,lastSaved="",savePromise=null;
 function saveNote(){const el=document.getElementById("savenote");if(!el)return;
-  el.textContent=S.save==="saving"?"Saving your draft…":S.save==="error"?`Your last change did not save. ${S.saveErr}`:"All changes are saved to your draft.";
+  el.textContent=S.save==="saving"?"Saving your edits…":S.save==="error"?`Your last edit did not save. ${S.saveErr}`:"All edits are saved here.";
   el.style.color=S.save==="error"?"var(--red)":"";}
 function scheduleSave(){if(!S.draft||S.offline)return;const j=JSON.stringify(S.draft);if(j===lastSaved)return;S.save="saving";saveNote();clearTimeout(saveT);saveT=setTimeout(()=>doSave(j),500);}
 function doSave(j){savePromise=(async()=>{try{await api("PUT","/api/draft",{draft:JSON.parse(j)});lastSaved=j;S.save=JSON.stringify(S.draft)===j?"saved":"saving";}catch(e){S.save="error";S.saveErr=e.message;}saveNote();})();return savePromise;}
-async function flushSave(){if(S.offline)return;clearTimeout(saveT);const j=JSON.stringify(S.draft);if(j!==lastSaved) await doSave(j);else if(savePromise) await savePromise;if(S.save==="error") throw new Error("Your draft could not be saved, so nothing was published. "+S.saveErr);}
+async function flushSave(){if(S.offline)return;clearTimeout(saveT);const j=JSON.stringify(S.draft);if(j!==lastSaved) await doSave(j);else if(savePromise) await savePromise;if(S.save==="error") throw new Error("Your edits could not be saved, so nothing was sent. "+S.saveErr);}
 window.addEventListener("beforeunload",e=>{if(S.draft&&JSON.stringify(S.draft)!==lastSaved){e.preventDefault();e.returnValue="";}});
 
 /* the guide's first messages: it has already looked at the draft */
 function greet(){
   const ch=changes(), bl=checks().filter(x=>x.level==="block");
-  addMsg({who:"g",x:ch.length?`Hi. I looked at your draft before you got here. It has ${ch.length} change${ch.length>1?"s":""} that ${ch.length>1?"are":"is"} not live yet.`:"Hi. Your draft matches what is live right now. Every change you make is saved as a draft until you publish."});
+  const P=S.proposal,N=S.notice;
+  addMsg({who:"g",x:N&&N.kind==="landed"?`Hi. Your proposal "${N.title}" landed, so a new version is on its way.`:P?`Hi. ${P.number?`Proposal #${P.number}`:"Your proposal"} is ${P.state==="in review"?"in review":"a draft"}, with ${P.changes.length} change${P.changes.length>1?"s":""}.${ch.length?` You also have ${ch.length} edit${ch.length>1?"s":""} that ${ch.length>1?"are":"is"} not in it yet.`:""}`:ch.length?`Hi. I looked at your edits before you got here. There ${ch.length>1?"are":"is"} ${ch.length} that ${ch.length>1?"are":"is"} not in a proposal yet.`:"Hi. Nothing is waiting. Every edit you make is saved here until you add it to a proposal."});
   bl.forEach(x=>{
     if(x.fix){const id=addProp(fixChanges(S.draft,x.fix));addMsg({who:"g",x:`${x.title} ${x.detail} Here is a fix that keeps your color.`,prop:id});}
     else addMsg({who:"g",x:`${x.title} ${x.detail}`});
@@ -1434,7 +1469,7 @@ function greet(){
     if(pal){const alt=pal.groups.filter(g=>g.id!=="base"&&g.id!=="accent").flatMap(g=>g.colors).find(c=>contrast("#FFFFFF",c.hex)>=4.5&&c.hex!==S.draft.brands[m[1]].primary);
       if(alt){const id2=addProp([{path:`brands.${m[1]}.primary`,value:alt.hex,why:`${alt.name} is in your color set. White words on it are easy to read.`}]);addMsg({who:"g",x:`Or, if white words matter more to you, I can use ${alt.name} from your color set for buttons.`,prop:id2});}}
   });
-  if(!bl.length&&ch.length) addMsg({who:"g",x:"Every must-pass check passes, so you can publish when you are ready."});
+  if(!bl.length&&ch.length) addMsg({who:"g",x:"Every must-pass check passes, so you can add your edits to a proposal when you are ready."});
   addMsg({who:"g",x:"You can talk to me any time by tapping the mic."});
 }
 async function boot(){

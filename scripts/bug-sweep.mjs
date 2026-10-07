@@ -25,7 +25,7 @@ const load = async () => {
   await page.goto(pathToFileURL(file).href); await page.waitForFunction(() => typeof S !== "undefined" && S.draft);
 };
 await load();
-const secs = await page.evaluate(() => ["color", "type", "space", "shape", "icons", "library", "checks", "publish", "history", "export", "figma", ...REG_ORDER]);
+const secs = await page.evaluate(() => ["color", "type", "space", "shape", "icons", "library", "checks", "proposal", "brands", "history", "export", "figma", ...REG_ORDER]);
 const layout = new Map();
 const SKIP = /^(voiceStart|voiceStop|asstOpenTalk|chrome|figDownload|figDownloadOut)$/;
 let clicks = 0;

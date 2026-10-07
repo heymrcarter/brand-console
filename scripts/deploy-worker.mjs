@@ -8,6 +8,7 @@
 //
 // Actions variables cannot start with GITHUB_, so the names differ from the Worker's:
 //   REPO -> GITHUB_REPO   BRANCH -> GITHUB_BRANCH   GH_APP_ID -> GITHUB_APP_ID   GH_APP_INSTALLATION_ID -> GITHUB_APP_INSTALLATION_ID
+//   STORYBOOK_PREVIEW_URL (optional) -> STORYBOOK_PREVIEW_URL
 //   TEAM_DOMAIN and POLICY_AUD keep their names. Secrets: GH_APP_PRIVATE_KEY -> GITHUB_APP_PRIVATE_KEY, ANTHROPIC_API_KEY.
 //
 // Usage (in GitHub Actions):  node scripts/deploy-worker.mjs
@@ -26,8 +27,13 @@ export async function checkSettings(env, { needCloudflare = true } = {}) {
   const problems = [], notes = [];
   const get = (k) => String(env[k] ?? "").trim();
   const vars = { GITHUB_REPO: get("REPO"), GITHUB_BRANCH: get("BRANCH") || "main", TEAM_DOMAIN: get("TEAM_DOMAIN"), POLICY_AUD: get("POLICY_AUD") };
+  const preview = get("STORYBOOK_PREVIEW_URL");
+  if (preview) {
+    if (!/^https:\/\/\S*\{number\}\S*$/.test(preview)) problems.push(`STORYBOOK_PREVIEW_URL must be an https address with {number} where the pull request number goes. It is ${JSON.stringify(preview)}.`);
+    else vars.STORYBOOK_PREVIEW_URL = preview;
+  }
 
-  if (!/^[\w.-]+\/[\w.-]+$/.test(vars.GITHUB_REPO)) problems.push(`REPO must be the repository the console publishes to, like "acme/design-system". It is ${JSON.stringify(vars.GITHUB_REPO)}.`);
+  if (!/^[\w.-]+\/[\w.-]+$/.test(vars.GITHUB_REPO)) problems.push(`REPO must be the design system repository that proposals go to, like "acme/design-system". It is ${JSON.stringify(vars.GITHUB_REPO)}.`);
   if (/\s/.test(vars.GITHUB_BRANCH)) problems.push(`BRANCH cannot have spaces. It is ${JSON.stringify(vars.GITHUB_BRANCH)}.`);
   // Access can only be turned on for a Worker that exists, so the first deploy has neither. The Worker then refuses
   // every request, which is safe. One without the other is a mistake.

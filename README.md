@@ -1,6 +1,6 @@
 # Brand Console
 
-The Brand Console is where the brand team changes the design system: colors, fonts, and component settings. It checks every change and publishes new versions. The team uses it online, on Cloudflare, behind the company's sign-in (see `docs/cloudflare.md`). This README is mostly for working on the console itself.
+The Brand Console is where the brand team changes the design system: colors, fonts, and component settings. It checks every change, and sends changes to the design system as proposals: pull requests that release a new version when they land. The team uses it online, on Cloudflare, behind the company's sign-in (see `docs/cloudflare.md`). This README is mostly for working on the console itself.
 
 The design system is its own repository, [heymrcarter/design-system](https://github.com/heymrcarter/design-system): the design tokens, the engine that turns them into what apps use, the React components, and Storybook. The console installs it as the `@heymrcarter/design-system` package and runs the same engine, so the console's checks and outputs are always the same as the design system's. It serves the matching Storybook, from `@heymrcarter/design-system-storybook`, at `/storybook/`. **Changes to the console never release a design system version.**
 
@@ -25,7 +25,7 @@ The design system is its own repository, [heymrcarter/design-system](https://git
    ```
 4. The console opens in your browser at **http://127.0.0.1:5173**, with Storybook at **/storybook/**. If another program already uses the port, the console picks a free one and prints its link.
 
-This runs the real Worker, the same code as on Cloudflare, in `wrangler dev`. It runs against a stand-in for GitHub that holds the sample design system in `fixtures/sample/`, so you need no GitHub repository, no Cloudflare account, and no internet. You can save, publish, and roll back as much as you like. It all disappears when you stop, and the next `npm start` begins again from the sample.
+This runs the real Worker, the same code as on Cloudflare, in `wrangler dev`. It runs against a stand-in for GitHub that holds the sample design system in `fixtures/sample/`, so you need no GitHub repository, no Cloudflare account, and no internet. You can edit, make proposals, land them, and roll back as much as you like. It all disappears when you stop, and the next `npm start` begins again from the sample.
 
 To stop, go back to the terminal and press **Ctrl + C**.
 
@@ -56,28 +56,29 @@ The console and your Figma library can send changes to each other. Either side c
 
 ## Things to try
 
-The sample draft already has changes that are not live yet. It passes every check.
+The sample design system has four released versions, and passes every check. Your edits are saved in the console until you add them to a proposal.
 
-1. **See the safety checks work.** Open **Color**, pick Northfield, and set **Words on the main color** to **White**. White words on this green are too hard to read, so the console blocks Publish. The guide explains why and offers a fix. Click **Add to my draft** on its suggestion. The change saves right away.
+1. **See the safety checks work.** Open **Color**, pick Northfield, and set **Words on the main color** to **White**. White words on this green are too hard to read, so the console will not let you add it to a proposal. The guide explains why and offers a fix. Click **Add to my edits** on its suggestion. The edit saves right away.
 2. **See it in the real component.** Open **Components → Actions → Button**. In the preview, set **Preview** to **Real component**. This is the actual React button from Storybook.
 3. **Change something.** Change the button **Corners** to **Round ends**. The console's own preview changes right away. The real component shows the design system version the console uses, so it does not change until a new version is released.
-4. **Publish.** Click **Review and publish**. Pick the kind of update (the console suggests one), read the note the guide wrote, and click **Publish**. Then open http://127.0.0.1:5173/dist/theme.css. Its first line now shows the new version number.
-5. **Roll back.** Open **Versions** and roll back to 1.3.0. This makes a new version, so nothing is lost. Your unpublished changes stay in your draft.
-6. **Look at the icons.** Open **Icons** under Foundations. Point at any icon to see its name. Click one to see its sizes and the code engineers use. Change **Line thickness** to make every icon bolder.
-7. **Give the page a gradient or a picture.** Open **Color** and find **Page style**. Pick **Gradient** or **Picture**. For a picture, the guide makes one from your brand colors first. You can keep it or upload your own. Then slide **Window and card see-through** to let the page show behind cards. The checks test the words on every part of the page.
-8. **Pick fonts.** Open **Type**. Pick a heading font, a body font, and a font for labels and navigation. Buttons use the label font. Try the **Elegant** set: Cormorant Garamond Italic headings, Atkinson Hyperlegible body text, and Avenir Next labels. Avenir Next and Avenir Next Mono need a license. Until your company adds the font files, the console shows a free look-alike. The checks warn you if a font is hard to read where you put it.
-9. **Pick a gray.** On the **Color** page, under **Shared colors**, set **Gray color** to **Match the brand**. Borders, help text, and quiet backgrounds pick up a hint of each brand's main color.
-10. **Compare before and after.** The preview always shows your change side by side with how it looked before. Drag the line to compare. Use **Compare with** to switch between your last change and the live version.
-11. **Add a brand.** Open **Brands** under Foundations and click **Add a brand**. Give it a name and its three colors. The console shows the id apps will use, like `data-brand="harbor"`. The id never changes, so you can rename the brand later without breaking apps. Move a brand to the top to make it the default. On **Review and publish**, adding a brand suggests new things (a minor version), and removing one suggests a big change (a major version).
-11. **Try dark mode.** Set **Mode** to **Dark** in the preview. Buttons keep the same color and the same words in both modes. Only the page around them changes.
-12. **Talk to the guide.** Tap the microphone and say what you want to change. Your browser may ask to use the microphone the first time.
-13. **Add a color to the color set.** On the **Color** page, scroll to the color set and click **Add a color**. Pick one from the color library, or type the hex code from your brand guide. Click a color's name to rename it, or click the X to remove it.
-14. **Add a font.** On the **Type** page, scroll to **Font library** and click **Add a font**. Type a name from Google Fonts, or upload your company's font files. For Avenir Next, pick **Add font files** to replace the free look-alike with the real font.
-15. **Look at Storybook.** Open **Open Storybook** at the top, or `/storybook/`. Use the toolbar at the top to switch brand, screen type, text size, and light or dark mode. Each component's **Docs** page shows the guidance that AI tools read.
+4. **Propose it.** Open **Proposal**. Your edits are listed. Check the note the console wrote, pick the kind of change (it suggests one), and click **Start the proposal**. That opens a draft pull request on the stand-in for GitHub, with your edits as one commit. Edit something else and add it as a second change. Click **Undo this change** on the first one: its values come back as edits, to add as a change that reverses it. Then click **Submit for review**.
+5. **Land it.** Nobody reviews pull requests on your computer, so `npm start` prints a `curl` command that lands it the way a reviewer would. Run it, then reload the console: it says the proposal landed, and **Live** shows the new version. Or use the other command to withdraw it: your edits stay.
+6. **Roll back.** Open **Versions** and roll back to 1.3.0. Your edits become that version, and anything you edited on top of the live version stays. It reaches apps only when you add it to a proposal and it lands.
+7. **Look at the icons.** Open **Icons** under Foundations. Point at any icon to see its name. Click one to see its sizes and the code engineers use. Change **Line thickness** to make every icon bolder.
+8. **Give the page a gradient or a picture.** Open **Color** and find **Page style**. Pick **Gradient** or **Picture**. For a picture, the guide makes one from your brand colors first. You can keep it or upload your own. Then slide **Window and card see-through** to let the page show behind cards. The checks test the words on every part of the page.
+9. **Pick fonts.** Open **Type**. Pick a heading font, a body font, and a font for labels and navigation. Buttons use the label font. Try the **Elegant** set: Cormorant Garamond Italic headings, Atkinson Hyperlegible body text, and Avenir Next labels. Avenir Next and Avenir Next Mono need a license. Until your company adds the font files, the console shows a free look-alike. The checks warn you if a font is hard to read where you put it.
+10. **Pick a gray.** On the **Color** page, under **Shared colors**, set **Gray color** to **Match the brand**. Borders, help text, and quiet backgrounds pick up a hint of each brand's main color.
+11. **Compare before and after.** The preview always shows your change side by side with how it looked before. Drag the line to compare. Use **Compare with** to switch between your last change and the live version.
+12. **Add a brand.** Open **Brands** under Foundations and click **Add a brand**. Give it a name and its three colors. The console shows the id apps will use, like `data-brand="harbor"`. The id never changes, so you can rename the brand later without breaking apps. Move a brand to the top to make it the default. On **Proposal**, adding a brand suggests new things (a minor version), and removing one suggests a big change (a major version).
+13. **Try dark mode.** Set **Mode** to **Dark** in the preview. Buttons keep the same color and the same words in both modes. Only the page around them changes.
+14. **Talk to the guide.** Tap the microphone and say what you want to change. Your browser may ask to use the microphone the first time.
+15. **Add a color to the color set.** On the **Color** page, scroll to the color set and click **Add a color**. Pick one from the color library, or type the hex code from your brand guide. Click a color's name to rename it, or click the X to remove it.
+16. **Add a font.** On the **Type** page, scroll to **Font library** and click **Add a font**. Type a name from Google Fonts, or upload your company's font files. For Avenir Next, pick **Add font files** to replace the free look-alike with the real font.
+17. **Look at Storybook.** Open **Open Storybook** at the top, or `/storybook/`. Use the toolbar at the top to switch brand, screen type, text size, and light or dark mode. Each component's **Docs** page shows the guidance that AI tools read.
 
 ## Start over with the sample data
 
-The sample design system in `fixtures/sample/` has three past versions and a draft with changes that are not live yet. This writes it again from scratch:
+The sample design system in `fixtures/sample/` is shaped like the design system repository: `tokens/` is main at version 1.5.0, `history/` holds the tokens of 1.2.0 to 1.4.0, and `releases.json` their notes. This writes it again from scratch:
 ```
 npm run reset-sample-data
 ```
@@ -87,11 +88,11 @@ npm run reset-sample-data
 ```
 npm test
 ```
-This checks that publishing, rolling back, and flagging all work, the storage the console saves through (on GitHub, in a Durable Object, on disk, and in memory), the API, the Figma sync against a stand-in for Figma's API, Cloudflare Access sign-in, GitHub App tokens, and the deploy settings.
+This checks proposals (opening one, adding changes, submitting, landing, withdrawing, a main that moved on, and a repository with no draft pull requests), rolling back, the storage the console saves through (on GitHub, in a Durable Object, on disk, and in memory), the API, the Figma sync against a stand-in for Figma's API, Cloudflare Access sign-in, GitHub App tokens, and the deploy settings.
 
 | Command | What it checks |
 |---|---|
-| `npm run test:worker` | The real Worker in `wrangler dev` against a stand-in for GitHub: the console page, Storybook, saving, a 2.5 MB font, publishing, rolling back, a restart, and sign-in. |
+| `npm run test:worker` | The real Worker in `wrangler dev` against a stand-in for GitHub: the console page, Storybook, saving, a 2.5 MB font, a restart, a proposal with two changes that is submitted and lands, rolling back, and sign-in. |
 | `npm run audit` | Every page of the console, for both sample brands, both modes, and both screen types. It measures every piece of text against the color behind it. Words need 4.5 to 1, and large words need 3 to 1. |
 | `npm run check:colors` | Every color is the same everywhere it shows up: the token files, `theme.css`, the console preview, and the hex labels next to each swatch. Set `STORYBOOK` to a Storybook address to include the real React components. |
 | `npm run stress` | Makes 16 random brand setups, lets the console fix what its checks catch, then looks at every page. Any text that is still hard to read is a bug, because the checks should have caught it. |
@@ -102,16 +103,16 @@ The browser checks need Playwright: `npm install --no-save playwright`, then `np
 
 ## Put it online for your team
 
-The console runs on Cloudflare Workers, with the design system in a GitHub repository and the company's sign-in in front. Every publish becomes a commit, and GitHub Actions deploys each change to the console. The steps are in `docs/cloudflare.md`.
+The console runs on Cloudflare Workers, with the design system in a GitHub repository and the company's sign-in in front. Each change in a proposal is a commit on a pull request to the design system. GitHub Actions deploys each change to the console. The steps are in `docs/cloudflare.md`.
 
 ## Where things live
 
 | Folder or file | What it holds |
 |---|---|
 | `console/` | The console screen. `app.js` is the screen, `index.html` its styles, and `engine-globals.js` puts the design system's engine on the page. |
-| `server/` | What the Worker runs to save, publish, roll back, and talk to Figma: the API, the store, and the Figma sync. They read and write files only through `server/storage/`: GitHub with a Durable Object online, and the project folder or memory for scripts and tests. `server/engine.mjs` loads the engine from the package. |
-| `worker/` | The console on Cloudflare Workers: the Worker, the Durable Object that holds unpublished changes, and the Cloudflare Access sign-in check. `wrangler.jsonc` is its settings. |
-| `fixtures/sample/` | The sample design system the tests and `npm start` use: `tokens/`, three versions in `releases/`, the live files in `dist/`, the draft's in `build/draft/`, and `CHANGELOG.md`. |
+| `server/` | What the Worker runs to save edits, make proposals, roll back, and talk to Figma: the API, the store, proposals (`proposals.mjs`, with `github-client.mjs`), and the Figma sync. They read and write files only through `server/storage/`: GitHub with a Durable Object online, and the project folder or memory for scripts and tests. `server/engine.mjs` loads the engine from the package. |
+| `worker/` | The console on Cloudflare Workers: the Worker, the Durable Object that holds the edits and the open proposal, and the Cloudflare Access sign-in check. `wrangler.jsonc` is its settings. |
+| `fixtures/sample/` | The sample design system the tests and `npm start` use, shaped like the design system repository: `tokens/` (main), `history/` (earlier versions), and `releases.json`. `test/helpers/sample-repo.mjs` turns it into a GitHub stand-in. |
 | `scripts/` | Running the console on your computer, the Worker test, the deploy, the prototype build, and the browser checks. |
 | `test/` | The automatic tests. |
 | `docs/cloudflare.md` | Putting the console online, and deploying it. |
@@ -119,12 +120,13 @@ The console runs on Cloudflare Workers, with the design system in a GitHub repos
 ## How it works
 
 - **One engine:** The console runs the design system's engine, `@heymrcarter/design-system/engine`, at the version in `package.json`. The server code and the Worker import it through `server/engine.mjs`. A browser cannot import a package by name, so the asset build and the prototype build bundle `console/engine-globals.js` into one script that puts the engine's names on the page. `app.js` is still a plain script that uses those names directly. Once it imports what it needs, `engine-globals.js` can go.
-- **One storage:** `server/store.mjs` and `server/figma.mjs` never touch the disk. They save and read through a small storage interface (`server/storage/storage.mjs`): read, write, list, remove, and commit. `github.mjs` reads the design system from a GitHub branch and holds changes in a pending storage (a Durable Object, `worker/durable-storage.mjs`) until a publish sends them all as one commit. It only uses `fetch`, so it runs in a Cloudflare Worker, and it keeps GitHub requests low: about 13 to load the console from scratch, none for a draft save, and 4 for a publish, plus one for each new font file. `disk.mjs` and `memory.mjs` are for scripts and tests. Secrets, like the Figma token, use a separate get and set interface. Store calls are async, and they run one at a time, so a save never lands in the middle of a publish.
-- **API** (served by the Worker, behind Cloudflare Access): `GET /api/state`, `PUT /api/draft`, `POST /api/publish`, `POST /api/rollback`, `POST /api/flag`, `POST /api/ask`, `POST /api/fonts`, and the Figma routes under `/api/figma/`. Changes must come from the console's own address.
-- **Checks run twice.** The console blocks Publish, and the server checks again before it writes a release.
-- **Version numbers:** Each publish picks one of three kinds of update, so engineers know how careful to be.
-  - **Patch** (1.4.0 to 1.4.1): only values change, like a color or a size. Every CSS variable and component name stays the same.
-  - **Minor** (1.4.0 to 1.5.0): something new is added, like a new color in a color set or a new component. Nothing is taken away.
-  - **Major** (1.4.0 to 2.0.0): a CSS variable or a component name is removed or renamed, or a component works differently. Apps may need changes.
-  The console compares the CSS variables in the live version and the draft, and suggests one. The brand team can pick another. A rollback is always minor. The API takes it as `POST /api/publish` with `{ "bump": "patch" | "minor" | "major" }`, and minor is the default.
+- **One storage:** `server/store.mjs` and `server/figma.mjs` never touch the disk. They read and save through a small storage interface (`server/storage/storage.mjs`): read, write, list, remove, and commit. Online, the storage is the design system repository's main branch on GitHub (`github.mjs`), with the edits waiting on top of it in a Durable Object (`worker/durable-storage.mjs`). The edits never go to main from here. A second storage reads main alone: that is **live**, with the version in its `package.json`. `disk.mjs` and `memory.mjs` are for scripts and tests. Store calls are async, and they run one at a time.
+- **Proposals** (`server/proposals.mjs`): **Add to proposal** turns the edits into one commit on a proposal branch, with a changeset (`.changeset/*.md`) that holds the change's bump and note. The first change opens a draft pull request, or, if the repository's plan has no draft pull requests, keeps the branch in the console until **Submit**, which opens the pull request. Each change is built on the newest main, plus the proposal's earlier commits, plus the edits, so there are never merge conflicts: for the files the console writes, its version wins. The console checks the pull request each time it loads, so it knows when the proposal has landed or been withdrawn. When it lands, the design system's Release workflow releases the version on its own; the console never releases anything. To undo a change, the console puts its earlier values back as edits, to add as a new change. History is never rewritten.
+- **API** (served by the Worker, behind Cloudflare Access): `GET /api/state`, `PUT /api/draft`, `POST /api/proposal/add`, `POST /api/proposal/submit`, `POST /api/proposal/withdraw`, `POST /api/proposal/dismiss`, `POST /api/rollback`, `POST /api/ask`, `POST /api/fonts`, and the Figma routes under `/api/figma/`. Changes must come from the console's own address. The version list comes from the design system's GitHub Releases.
+- **Checks run three times.** The console will not add a change while a check blocks it, the server checks again before it commits, and the design system's CI checks every pull request.
+- **Kinds of change:** Each change picks one, so engineers know how careful to be. The biggest change in a proposal decides its version.
+  - **A fix** (patch, 1.4.0 to 1.4.1): only values change, like a color or a size. Every CSS variable and component name stays the same.
+  - **New things** (minor, 1.4.0 to 1.5.0): something new is added, like a new brand, a color in a color set, or a component. Nothing is taken away.
+  - **A big change** (major, 1.4.0 to 2.0.0): something apps use is removed or renamed, like a brand or a CSS variable. Apps may need changes.
+  The console compares the edits with the proposal, or with live, and suggests one. The brand team can pick another.
 - **Sign-in:** Cloudflare Access signs people in, and the Worker checks its token on every request (`worker/access.mjs`). Everyone is an admin for now. Roles (Viewer, Editor, and Admin) are planned, with Microsoft Entra ID groups deciding who has which.
