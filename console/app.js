@@ -8,7 +8,7 @@ const S={
   base:null,             // the design system at the proposal's newest commit, or null with no proposal
   proposal:null, notice:null,
   draft:null,
-  ui:{brand:"",q:"",openCats:{},mode:"light",ba:false,baPos:50,chrome:null,compare:false,ctx:"consumer",size:"large",vp:"desktop",asst:window.innerWidth>1100,exportFile:"theme.css",src:"sample",baBase:"last",publishNote:null,confirmRb:null},
+  ui:{brand:"",q:"",openCats:{},mode:"light",ba:false,baPos:50,chrome:null,compare:false,ctx:"consumer",size:"large",vp:"desktop",asst:window.innerWidth>1100,exportFile:"theme.css",src:"sample",baBase:"live",baView:"slider",publishNote:null,confirmRb:null},
   history:[],
   storybook:"http://127.0.0.1:6006",
   save:"saved", saveErr:"",
@@ -137,7 +137,7 @@ function pvControls(){
   const ch=changes().length;
   return `<div class="pvhead"><div class="r1"><span class="t">Live preview</span><span class="under" style="margin-left:auto">Click any part to edit it.</span></div>
     <div class="pvctl">
-      ${!realOn()?`<div class="g"><span>Compare with</span>${seg("ui.baBase",u.baBase,[["last","Your last change"],["live","Live version"]],{label:"Compare with"})}</div>`:""}
+      ${!realOn()?`<div class="g"><span>Compare with</span>${seg("ui.baBase",u.baBase,[["live","Live version"],["last","Your last change"]],{label:"Compare with"})}</div><div class="g"><span>Show</span>${seg("ui.baView",u.baView||"slider",[["slider","Slider"],["side","Side by side"]],{label:"How to compare"})}</div>`:""}
       ${STORY[S.sec]&&!S.offline?`<div class="g"><span>Preview</span>${seg("ui.src",u.src,[["sample","Console sample"],["real","Real component"]],{label:"Preview source"})}</div>`:""}
       <div class="g"><span>Mode</span>${seg("ui.mode",u.mode,[["light","Light"],["dark","Dark"]],{label:"Color mode"})}</div>
       <div class="g"><span>Screen</span>${seg("ui.ctx",u.ctx,[["consumer","Consumer"],["employee","Employee"]],{label:"Screen type"})}</div>
@@ -164,14 +164,18 @@ function preview(kind){
   let body;
   if(realOn()&&STORY[kind]) body=storyFrame(kind);
   else {
-    const n=changes().length, useLast=u.baBase==="last"&&S.beforeLast;
+    // Against the live version, everything not released yet counts: the proposal's changes and the edits.
+    const n=diff(S.published,S.draft).length, useLast=u.baBase==="last"&&S.beforeLast;
     const base=useLast?S.beforeLast:S.published;
     const left=useLast?`Before: ${esc(S.lastEditLabel||"your last change")}`:`Before: live version ${S.published.version}`;
-    const right=useLast?"After: your draft now":`After: your draft${n?` · ${n} change${n>1?"s":""}`:""}`;
+    const right=useLast?"After: your edits now":`After: with your edits${n?` · ${n} change${n>1?"s":""}`:""}`;
     /* A brand added in this draft has nothing to compare with yet. */
     if(!Object.hasOwn(base.brands,u.brand)) body=`<div class="ba-tags"><span class="ba-tag">${esc(bn(u.brand))} is new. ${useLast?"It was not there before your last change.":`It is not in live version ${S.published.version} yet.`}</span></div>${frame(st,kind)}`;
+    /* Side by side: for a change that moves things around, where a slider's two halves would not line up. */
+    else if(u.baView==="side") body=`<div class="ba-side"><div><div class="ba-tags"><span class="ba-tag">${left}</span></div>${frame(base,kind)}</div><div><div class="ba-tags"><span class="ba-tag">${right}</span></div>${frame(st,kind)}</div></div>
+      ${!useLast&&!n?`<p class="under" style="margin-top:8px">You have no edits yet, so both sides look the same.</p>`:""}`;
     else body=`<div class="ba-tags"><span class="ba-tag">${I.chevL} ${left}</span><span class="ba-tag">${right} ${I.chevR}</span></div><div class="ba" id="ba" style="--pos:${u.baPos}%"><div class="ba-l">${frame(base,kind)}</div><div class="ba-r">${frame(st,kind)}</div><div class="ba-line" aria-hidden="true"><span>${I.chevL}${I.chevR}</span></div></div>
-      <div class="ba-ctl"><label for="baslider" class="under">Drag the line, or use this slider, to compare.</label><input type="range" id="baslider" min="0" max="100" value="${u.baPos}" aria-label="Move the line between before and after"></div>
+      <div class="ba-ctl"><label for="baslider" class="under">Drag across the preview, or use this slider, to compare. If the two sides do not line up, try Side by side.</label><input type="range" id="baslider" min="0" max="100" value="${u.baPos}" aria-label="Move the line between before and after"></div>
       ${u.baBase==="last"&&!S.beforeLast?`<p class="under" style="margin-top:8px">Make a change on any page to compare it here. Until then, this shows the live version on the left.</p>`:(!useLast&&!n)?`<p class="under" style="margin-top:8px">You have no edits yet, so both sides look the same.</p>`:""}`;
   }
   return `<div class="pvcol" id="pvcol">${pvControls()}<div class="pvbody" id="pvbody"><div class="reachwrap"><div class="reach" id="reach" aria-live="polite"></div></div>${note}${body}<div class="pickbox" id="pickbox" hidden><span></span></div></div></div>`;
@@ -1418,16 +1422,22 @@ document.addEventListener("keydown",e=>{
   if(e.target.id==="askin"&&e.key==="Enter"){e.preventDefault();ask(S.draftText);}
 });
 /* canvas: hover to see what you would edit, click to open it */
-let baDrag=false;
+/* Dragging anywhere on the preview moves the line. A click that does not move still picks a part to edit. */
+let baDrag=false,baStart=null,baSkipClick=false;
 function setBa(x){const ba=document.getElementById("ba");if(!ba)return;const r=ba.getBoundingClientRect();S.ui.baPos=Math.max(0,Math.min(100,Math.round((x-r.left)/r.width*100)));ba.style.setProperty("--pos",S.ui.baPos+"%");const sl=document.getElementById("baslider");if(sl)sl.value=S.ui.baPos;}
-document.addEventListener("pointerdown",e=>{const ba=e.target.closest("#ba");if(!ba)return;const r=ba.getBoundingClientRect();const lx=r.left+r.width*S.ui.baPos/100;if(Math.abs(e.clientX-lx)<28){baDrag=true;ba.setPointerCapture&&ba.setPointerCapture(e.pointerId);setBa(e.clientX);e.preventDefault();}});
-document.addEventListener("pointermove",e=>{if(baDrag){setBa(e.clientX);return;}
+document.addEventListener("pointerdown",e=>{const ba=e.target.closest("#ba");if(!ba||e.button>0)return;baStart={x:e.clientX,id:e.pointerId,moved:false};
+  const r=ba.getBoundingClientRect(),lx=r.left+r.width*S.ui.baPos/100;
+  if(Math.abs(e.clientX-lx)<28){baDrag=true;ba.setPointerCapture&&ba.setPointerCapture(e.pointerId);setBa(e.clientX);e.preventDefault();}});
+document.addEventListener("pointermove",e=>{
+  if(baStart&&!baDrag&&Math.abs(e.clientX-baStart.x)>6){const ba=document.getElementById("ba");if(ba){baDrag=true;ba.setPointerCapture&&ba.setPointerCapture(baStart.id);}}
+  if(baDrag){if(baStart)baStart.moved=true;setBa(e.clientX);const box=document.getElementById("pickbox");if(box)box.hidden=true;return;}
   const pb=e.target.closest&&e.target.closest("#pvbody"), box=document.getElementById("pickbox");if(!box)return;
   if(!pb){box.hidden=true;return;}
   const h=pickAt(e.target);if(!h){box.hidden=true;return;}
   placeBox(box,h.el,`${REG[h.id].name}${h.id===S.sec?"":" · click to edit"}`);});
-document.addEventListener("pointerup",()=>{baDrag=false;});
+document.addEventListener("pointerup",()=>{if(baDrag&&baStart&&baStart.moved){baSkipClick=true;setTimeout(()=>{baSkipClick=false;},400);}baDrag=false;baStart=null;});
 document.addEventListener("click",e=>{
+  if(baSkipClick&&e.target.closest("#ba")){baSkipClick=false;e.preventDefault();e.stopPropagation();return;}
   if(e.target.closest(".pvnote,.ba-ctl"))return;
   const pb=e.target.closest("#pvbody");if(!pb)return;
   const h=pickAt(e.target);if(!h)return;
