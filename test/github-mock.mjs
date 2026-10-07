@@ -12,7 +12,7 @@ const json = (status, body) => new Response(JSON.stringify(body), { status, head
  * files: main's files, as { path: text or Uint8Array }. history: optional earlier commits, oldest first, as
  * [{ files, message, tag, release: { name, body, date } }]. A commit with a tag gets one, and with release, a release.
  */
-export function createGitHubMock({ repo = "acme/design-system", branch = "main", token = "test-token", files = {}, draftPRs = true, releases: firstReleases = [], history = [], mainTag = null, mainRelease = null } = {}) {
+export function createGitHubMock({ repo = "acme/design-system", branch = "main", token = "test-token", files = {}, draftPRs = true, releases: firstReleases = [], history = [], mainTag = null, mainRelease = null, collaborators = null } = {}) {
   const blobs = new Map(), trees = new Map(), commits = new Map(), refs = new Map(), tags = new Map(), calls = [];
   const pulls = new Map(), releases = [...firstReleases];
   const toBytes = (v) => (typeof v === "string" ? new TextEncoder().encode(v) : new Uint8Array(v));
@@ -62,9 +62,22 @@ export function createGitHubMock({ repo = "acme/design-system", branch = "main",
         if ([...pulls.values()].some((x) => x.head.ref === body.head && x.state === "open")) return json(422, { message: "A pull request already exists" });
         if (body.draft && !draftPRs) return json(422, { message: "Validation Failed", errors: [{ resource: "PullRequest", code: "custom", message: "Draft pull requests are not supported in this repository." }] });
         const number = pulls.size + 1;
-        const pr = { number, node_id: `PR_${number}`, title: body.title, body: body.body || "", draft: !!body.draft, state: "open", merged: false, head: { ref: body.head }, base: { ref: body.base }, html_url: `https://github.com/${repo}/pull/${number}` };
+        const pr = { requested: [], reviews: [], number, node_id: `PR_${number}`, title: body.title, body: body.body || "", draft: !!body.draft, state: "open", merged: false, head: { ref: body.head }, base: { ref: body.base }, html_url: `https://github.com/${repo}/pull/${number}` };
         pulls.set(number, pr);
         return json(201, pr);
+      }
+      const rv = r.match(/^pulls\/(\d+)\/(requested_reviewers|reviews)$/);
+      if (rv && pulls.has(+rv[1])) {
+        const pr = pulls.get(+rv[1]);
+        if (rv[2] === "reviews" && method === "GET") return json(200, pr.reviews.map((x) => ({ user: { login: x.login }, state: x.state, commit_id: x.commit, submitted_at: x.at, html_url: `${pr.html_url}#review` })));
+        if (rv[2] === "requested_reviewers" && method === "GET") return json(200, { users: pr.requested.map((login) => ({ login, html_url: `https://github.com/${login}` })), teams: [] });
+        if (rv[2] === "requested_reviewers" && method === "POST") {
+          // Like GitHub: only people with access can be asked.
+          const bad = (body.reviewers || []).filter((l) => collaborators && !collaborators.includes(l));
+          if (bad.length) return json(422, { message: "Reviews may only be requested from collaborators. One or more of the users or teams you specified is not a collaborator of the " + repo + " repository." });
+          for (const l of body.reviewers || []) if (!pr.requested.includes(l)) pr.requested.push(l);
+          return json(201, pr);
+        }
       }
       const pm = r.match(/^pulls\/(\d+)$/);
       if (pm && pulls.has(+pm[1])) {
@@ -178,6 +191,14 @@ export function createGitHubMock({ repo = "acme/design-system", branch = "main",
         releases.push({ tag_name: `v${release}`, name: `v${release}`, body: pr.title, draft: false, published_at: "2026-10-07T12:00:00Z", html_url: `https://github.com/${repo}/releases/tag/v${release}` });
       }
     },
+    /** Someone reviews a pull request on GitHub: state is APPROVED, CHANGES_REQUESTED, or COMMENTED. */
+    review(number, login, state) {
+      const pr = pulls.get(number);
+      pr.reviews.push({ login, state, commit: refs.get(pr.head.ref), at: "2026-10-07T12:00:00Z" });
+      pr.requested = pr.requested.filter((l) => l !== login); // Any review answers the request.
+    },
+    /** Someone is asked to review on GitHub. */
+    requestReview(number, login) { const pr = pulls.get(number); if (!pr.requested.includes(login)) pr.requested.push(login); },
     /** A reviewer closes a pull request without merging it. */
     close(number) { pulls.get(number).state = "closed"; },
     /** Someone else pushes a commit, like a teammate or another copy of the console. */

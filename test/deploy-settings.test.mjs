@@ -66,3 +66,10 @@ test("a Storybook preview address is optional, and must say where the pull reque
   const bad = await checkSettings({ ...good, GH_APP_PRIVATE_KEY: KEY, STORYBOOK_PREVIEW_URL: "https://pr-design-system-storybook.acme.workers.dev" });
   assert.ok(bad.problems.some((p) => /\{number\}/.test(p)));
 });
+
+test("reviewers are optional GitHub logins, separated by commas", async () => {
+  const ok = await checkSettings({ ...good, GH_APP_PRIVATE_KEY: KEY, REVIEWERS: " heymrcarter, sam-lee " });
+  assert.equal(ok.vars.REVIEWERS, "heymrcarter,sam-lee");
+  const bad = await checkSettings({ ...good, GH_APP_PRIVATE_KEY: KEY, REVIEWERS: "sam lee,@pat" });
+  assert.ok(bad.problems.some((p) => /REVIEWERS must be GitHub logins/.test(p) && /sam lee, @pat/.test(p)));
+});

@@ -12,7 +12,7 @@ import { engineBehind, ENGINE_VERSION } from "../server/engine.mjs";
 
 const REPO = "acme/design-system", TOKEN = "test-token", MAYA = { email: "maya@example.com", name: "Maya R." };
 
-function setup({ engineVersion, ...opts } = {}) {
+function setup({ engineVersion, reviewers, ...opts } = {}) {
   const mock = sampleRepo({ repo: REPO, token: TOKEN, ...opts });
   let clock = Date.parse("2026-10-07T10:00:00Z");
   const now = () => new Date((clock += 1000));
@@ -20,7 +20,7 @@ function setup({ engineVersion, ...opts } = {}) {
   const storage = gh(createMemoryStorage()), live = gh(createMemoryStorage());
   const store = createStore(storage, { live });
   const github = createGitHubClient({ repo: REPO, token: TOKEN, fetch: mock.fetch });
-  const proposals = createProposals({ github, store, edits: storage, kv: createMemoryKV(), previewUrl: "https://pr-{number}-sb.example.workers.dev", now, engineVersion: engineVersion || "1.0.0" });
+  const proposals = createProposals({ github, store, edits: storage, kv: createMemoryKV(), previewUrl: "https://pr-{number}-sb.example.workers.dev", now, engineVersion: engineVersion || "1.0.0", reviewers: reviewers || [] });
   const edit = async (fn) => { const d = await store.draft(); fn(d); await store.saveDraft(d); };
   const changesets = (branch) => Object.keys(mock.files(branch)).filter((p) => /^\.changeset\/console-/.test(p)).map((p) => mock.text(p, branch));
   return { mock, store, proposals, edit, changesets, E: store.E };
@@ -232,4 +232,39 @@ test("while the console's engine is a minor or major version behind live, no cha
   const patchBehind = setup({ engineVersion: "1.0.0" });
   await patchBehind.edit((d) => { d.shape.radius += 2; });
   assert.equal((await patchBehind.proposals.add({ note: "Rounder corners", who: MAYA })).proposal.number, 1);
+});
+
+test("submitting asks the usual reviewers, and the console shows whose approval is still pending", async () => {
+  const { mock, proposals, edit } = setup({ reviewers: ["sam", "lee"], collaborators: ["sam", "lee", "pat"] });
+  await edit((d) => { d.shape.radius += 2; });
+  const draft = await proposals.add({ note: "Rounder corners", who: MAYA });
+  assert.deepEqual(draft.proposal.reviewers, ["sam", "lee"], "a draft says who will be asked");
+  assert.deepEqual(draft.proposal.review, { pending: [], people: [], warning: null });
+  let s = await proposals.submit();
+  assert.deepEqual(s.proposal.review.pending.map((p) => p.login), ["sam", "lee"], "both are asked when it is submitted");
+  mock.review(1, "sam", "APPROVED");
+  mock.review(1, "lee", "CHANGES_REQUESTED");
+  mock.requestReview(1, "pat"); // Someone asked on GitHub shows up too.
+  s = await proposals.status();
+  assert.deepEqual(s.proposal.review.pending.map((p) => p.login), ["pat"]);
+  assert.deepEqual(s.proposal.review.people.map((p) => [p.login, p.state, p.current]), [["sam", "approved", true], ["lee", "changes requested", true]]);
+  // A comment does not replace an approval. A change added after it makes the approval one for an earlier version.
+  mock.review(1, "sam", "COMMENTED");
+  await edit((d) => { d.shape.radius += 1; });
+  s = await proposals.add({ note: "A bit rounder, from review", who: MAYA });
+  const sam = s.proposal.review.people.find((p) => p.login === "sam");
+  assert.deepEqual([sam.state, sam.current], ["approved", false]);
+  mock.review(1, "lee", "APPROVED");
+  s = await proposals.status();
+  assert.equal(s.proposal.review.people.find((p) => p.login === "lee").state, "approved", "a newer answer replaces an older one");
+});
+
+test("if GitHub will not ask a reviewer, the proposal is still submitted, and the console says why", async () => {
+  const { mock, proposals, edit } = setup({ reviewers: ["someone-else"], collaborators: ["sam"] });
+  await edit((d) => { d.shape.radius += 2; });
+  await proposals.add({ note: "Rounder corners", who: MAYA });
+  const s = await proposals.submit();
+  assert.equal(s.proposal.state, "in review");
+  assert.equal(mock.pull(1).draft, false);
+  assert.match(s.proposal.review.warning, /did not ask someone-else to review: Reviews may only be requested from collaborators/);
 });

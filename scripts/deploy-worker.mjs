@@ -8,7 +8,7 @@
 //
 // Actions variables cannot start with GITHUB_, so the names differ from the Worker's:
 //   REPO -> GITHUB_REPO   BRANCH -> GITHUB_BRANCH   GH_APP_ID -> GITHUB_APP_ID   GH_APP_INSTALLATION_ID -> GITHUB_APP_INSTALLATION_ID
-//   STORYBOOK_PREVIEW_URL (optional) -> STORYBOOK_PREVIEW_URL
+//   STORYBOOK_PREVIEW_URL (optional) -> STORYBOOK_PREVIEW_URL   REVIEWERS (optional) -> REVIEWERS
 //   TEAM_DOMAIN and POLICY_AUD keep their names. Secrets: GH_APP_PRIVATE_KEY -> GITHUB_APP_PRIVATE_KEY, ANTHROPIC_API_KEY.
 //
 // Usage (in GitHub Actions):  node scripts/deploy-worker.mjs
@@ -27,6 +27,13 @@ export async function checkSettings(env, { needCloudflare = true } = {}) {
   const problems = [], notes = [];
   const get = (k) => String(env[k] ?? "").trim();
   const vars = { GITHUB_REPO: get("REPO"), GITHUB_BRANCH: get("BRANCH") || "main", TEAM_DOMAIN: get("TEAM_DOMAIN"), POLICY_AUD: get("POLICY_AUD") };
+  const reviewers = get("REVIEWERS");
+  if (reviewers) {
+    const logins = reviewers.split(",").map((x) => x.trim()).filter(Boolean);
+    const bad = logins.filter((l) => !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/.test(l));
+    if (bad.length) problems.push(`REVIEWERS must be GitHub logins separated by commas, like "sam,lee". These are not: ${bad.join(", ")}.`);
+    else vars.REVIEWERS = logins.join(",");
+  }
   const preview = get("STORYBOOK_PREVIEW_URL");
   if (preview) {
     if (!/^https:\/\/\S*\{number\}\S*$/.test(preview)) problems.push(`STORYBOOK_PREVIEW_URL must be an https address with {number} where the pull request number goes. It is ${JSON.stringify(preview)}.`);

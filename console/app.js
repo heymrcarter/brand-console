@@ -125,7 +125,7 @@ function nav(){
 }
 function topbar(){
   return `<div class="top"><div style="display:flex;align-items:center;gap:12px;min-width:0"><div class="gbadge" style="width:26px;height:26px;border-radius:7px;background:conic-gradient(${brands().map((b,i)=>`${S.draft.brands[b.id].primary} ${i*100/brands().length}% ${(i+1)*100/brands().length}%`).join(",")})"></div><div class="t">Brand Console</div><div class="v hide-s">Design system for ${brands().length} brand${brands().length>1?"s":""}</div></div>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">${S.me?`<span class="who hide-s" title="Signed in as ${esc(S.me.email)}">${esc(S.me.name||S.me.email)}</span>`:""}${S.offline?"":`<a class="sblink hide-s" href="${esc(S.storybook)}" target="_blank" rel="noopener">Open Storybook</a>`}<span class="pill ok">Live: v${S.published.version}</span>${S.proposal?(S.proposal.url?`<a class="pill ${S.proposal.state==="in review"?"warn":"neutral"} hide-s" href="${esc(S.proposal.url)}" target="_blank" rel="noopener">${S.proposal.state==="in review"?"In review":"Draft proposal"}: #${S.proposal.number}</a>`:`<span class="pill neutral hide-s">Draft proposal</span>`):""}${changes().length?`<span class="pill warn hide-s">Draft edits</span>`:""}</div></div>`;
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">${S.me?`<span class="who hide-s" title="Signed in as ${esc(S.me.email)}">${esc(S.me.name||S.me.email)}</span>`:""}${S.offline?"":`<a class="sblink hide-s" href="${esc(S.storybook)}" target="_blank" rel="noopener">Open Storybook</a>`}<span class="pill ok">Live: v${S.published.version}</span>${S.proposal?(S.proposal.url?`<a class="pill ${S.proposal.state==="in review"?"warn":"neutral"} hide-s" href="${esc(S.proposal.url)}" target="_blank" rel="noopener" title="${esc(reviewSummary(S.proposal)||"Open the pull request")}">${S.proposal.state==="in review"?"In review":"Draft proposal"}: #${S.proposal.number}</a>`:`<span class="pill neutral hide-s">Draft proposal</span>`):""}${changes().length?`<span class="pill warn hide-s">Draft edits</span>`:""}</div></div>`;
 }
 
 /* =====================================================================
@@ -664,9 +664,28 @@ function proposalBox(){
   const what=P.state==="in review"?"Reviewers can see it now. You can still add changes, for example to answer their comments.":P.number?"It is a draft pull request. Reviewers are not asked to look until you submit it.":"It is saved as a branch. The pull request opens when you submit it.";
   return `<div class="box"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div class="bt" style="flex-grow:1">${P.number?`Proposal #${P.number}`:"Your proposal"}: ${esc(P.title)}</div>${state}</div>
     <div class="bs">${what} When it lands, it becomes version <b>${nv}</b> (${KIND[P.bump].toLowerCase()}).${links?`<br>${links}`:""}</div>
+    ${reviewBox(P)}
     <ol class="pchanges">${list}</ol>
     ${canEdit()?(conf?`<div class="confirm"><div style="font-size:13px;font-weight:700">Withdraw this proposal?</div><div class="under" style="color:var(--ink)">The pull request closes and its branch is deleted. Your edits stay here, so you can propose them again.</div><div class="btns">${btn("Withdraw it","withdraw",{p:1,s:1})}${btn("Keep it","withdrawCancel",{s:1})}</div></div>`
       :`<div class="btns">${P.state!=="in review"?btn("Submit for review","submitProposal",{p:1,s:1}):""}${btn("Withdraw","withdrawAsk",{s:1})}</div>`):""}</div>`;
+}
+/* Where the approvals stand. Reviewers approve on GitHub, on the pull request; the console only shows it. */
+function reviewSummary(P){const R=P&&P.review;if(!R)return "";const w=R.pending.length,ok=R.people.filter(p=>p.state==="approved"&&p.current).length,ch=R.people.filter(p=>p.state==="changes requested").length;
+  return [ok?`${ok} approved`:"",ch?`${ch} asked for changes`:"",w?`waiting on ${w}`:""].filter(Boolean).join(", ");}
+function reviewBox(P){
+  const names=l=>l.map(x=>x.login?`<a href="https://github.com/${esc(x.login)}" target="_blank" rel="noopener">@${esc(x.login)}</a>`:`the ${esc(x.team)} team`).join(", ");
+  if(!P.number) return (P.reviewers||[]).length?`<div class="under">When you submit it, ${names(P.reviewers.map(login=>({login})))} ${P.reviewers.length>1?"are":"is"} asked to review it.</div>`:"";
+  const R=P.review;if(!R)return "";
+  const of=st=>R.people.filter(p=>p.state===st);
+  const rows=[];
+  const approved=of("approved");
+  if(approved.length) rows.push(`<div class="revrow"><span class="pill ok">Approved</span><span>${approved.map(p=>`${names([p])}${p.current?"":` <span class="under">(an earlier version, before the newest change)</span>`}`).join(", ")}</span></div>`);
+  if(of("changes requested").length) rows.push(`<div class="revrow"><span class="pill bad">Asked for changes</span><span>${of("changes requested").map(p=>`${names([p])}${p.url?` · <a href="${esc(p.url)}" target="_blank" rel="noopener">what they said</a>`:""}`).join(", ")}</span></div>`);
+  if(R.pending.length) rows.push(`<div class="revrow"><span class="pill warn">Waiting on</span><span>${names(R.pending)}</span></div>`);
+  if(of("commented").length) rows.push(`<div class="revrow"><span class="pill neutral">Commented</span><span>${names(of("commented"))}</span></div>`);
+  if(of("dismissed").length) rows.push(`<div class="revrow"><span class="pill neutral">Review dismissed</span><span>${names(of("dismissed"))}</span></div>`);
+  const none=!rows.length?`<div class="under">${P.state==="in review"?"Nobody has been asked to review it yet. Anyone with access can be asked on its pull request.":(P.reviewers||[]).length?`When you submit it, ${names(P.reviewers.map(login=>({login})))} ${P.reviewers.length>1?"are":"is"} asked to review it.`:"Reviewers are asked on its pull request, once you submit it."}</div>`:"";
+  return `<div class="reviews"><div class="fl">Reviews</div>${rows.join("")}${none}${R.warning?`<div class="under" style="color:var(--amber)">${esc(R.warning)}</div>`:""}${R.error?`<div class="under" style="color:var(--red)">${esc(R.error)}</div>`:""}<div class="under">People review and approve on GitHub, on the pull request.</div></div>`;
 }
 function noticeBox(){
   const N=S.notice; if(!N) return "";

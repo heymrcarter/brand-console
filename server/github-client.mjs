@@ -85,6 +85,18 @@ export function createGitHubClient({ repo, token, apiBase = "https://api.github.
     },
     async pull(number) { return gh("GET", `/pulls/${number}`); },
     async updatePull(number, fields) { return gh("PATCH", `/pulls/${number}`, fields); },
+    /** Asks people to review a pull request, by GitHub login. */
+    async requestReviewers(number, logins) { return gh("POST", `/pulls/${number}/requested_reviewers`, { reviewers: logins }); },
+    /** Who has been asked to review and has not yet: [{ login, url }], with teams as [{ team }]. */
+    async requestedReviewers(number) {
+      const r = await gh("GET", `/pulls/${number}/requested_reviewers`);
+      return [...(r.users || []).map((u) => ({ login: u.login, url: u.html_url })), ...(r.teams || []).map((t) => ({ team: t.slug || t.name, url: t.html_url }))];
+    },
+    /** Every review, oldest first: [{ login, state, commit, at, url }]. state is APPROVED, CHANGES_REQUESTED, COMMENTED, or DISMISSED. */
+    async reviews(number) {
+      const list = await gh("GET", `/pulls/${number}/reviews?per_page=100`);
+      return list.filter((r) => r.user && r.state !== "PENDING").map((r) => ({ login: r.user.login, state: r.state, commit: r.commit_id, at: r.submitted_at, url: r.html_url }));
+    },
     /** Marks a draft pull request ready for review. GitHub only has this in its GraphQL API. */
     async readyForReview(nodeId) {
       const r = await call("POST", `${root}/graphql`, { query: "mutation($id: ID!) { markPullRequestReadyForReview(input: { pullRequestId: $id }) { pullRequest { isDraft } } }", variables: { id: nodeId } });

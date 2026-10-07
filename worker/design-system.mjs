@@ -41,7 +41,7 @@ export class DesignSystem extends DurableObject {
     // The Worker has 10 ms of CPU per request on the free plan, so the engine's results are not copied. See server/engine.mjs.
     const store = createStore(storage, { live, copyEngineResults: false });
     const github = createGitHubClient({ repo: env.GITHUB_REPO, token, apiBase });
-    const proposals = createProposals({ github, store, edits: storage, kv: createDurableKV(sql), base: branch, previewUrl: env.STORYBOOK_PREVIEW_URL || "", onLanded: () => { storage.refresh(); live.refresh(); } });
+    const proposals = createProposals({ github, store, edits: storage, kv: createDurableKV(sql), base: branch, previewUrl: env.STORYBOOK_PREVIEW_URL || "", reviewers: String(env.REVIEWERS || "").split(",").map((x) => x.trim()).filter(Boolean), onLanded: () => { storage.refresh(); live.refresh(); } });
     const figma = createFigma({ storage, secrets: createDurableSecrets(sql, env), store, apiBase: env.FIGMA_API || undefined });
     const model = env.ANTHROPIC_MODEL || "claude-sonnet-5";
     const api = createApi({

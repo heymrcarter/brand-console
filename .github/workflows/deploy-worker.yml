@@ -51,6 +51,7 @@ jobs:
       REPO: ${{ vars.REPO }}
       BRANCH: ${{ vars.BRANCH }}
       STORYBOOK_PREVIEW_URL: ${{ vars.STORYBOOK_PREVIEW_URL }}
+      REVIEWERS: ${{ vars.REVIEWERS }}
       GH_APP_ID: ${{ vars.GH_APP_ID }}
       GH_APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
       TEAM_DOMAIN: ${{ vars.TEAM_DOMAIN }}

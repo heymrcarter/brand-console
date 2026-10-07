@@ -27,10 +27,11 @@ const fontFiles = (st) => Object.values((st && st.fontLib && st.fontLib.files) |
  * edits: the store's storage, where uploaded font files wait. kv: { get(key), set(key, value) } that lasts.
  * previewUrl: optional "https://pr-{number}-...workers.dev", where each pull request's Storybook is.
  * onLanded: called when a proposal has landed, so storages that keep main's commit for a while read it again.
+ * reviewers: GitHub logins to ask for a review when a proposal is submitted. Anyone can also be asked on GitHub.
  * engineVersion: the design system version whose engine the console runs. While the live version is a newer minor
  *   or major version, no change can be added: the console updates itself on each release, in a few minutes.
  */
-export function createProposals({ github, store, edits, kv, base = "main", previewUrl = "", onLanded = () => {}, engineVersion = ENGINE_VERSION, now = () => new Date() }) {
+export function createProposals({ github, store, edits, kv, base = "main", previewUrl = "", onLanded = () => {}, reviewers = [], engineVersion = ENGINE_VERSION, now = () => new Date() }) {
   const E = store.E;
   const states = new Map(); // commit sha -> state. A commit never changes, so neither does its state.
   let releases = null; // { at, list }: the release list, kept for a minute.
@@ -90,13 +91,37 @@ export function createProposals({ github, store, edits, kv, base = "main", previ
       state: rec.number && !rec.draft ? "in review" : "draft",
       submitted: !!rec.submitted, bump, changes: rec.changes,
       preview: rec.number && previewUrl ? previewUrl.replace("{number}", rec.number) : null,
+      reviewers,
     };
+  }
+
+  const REVIEW_STATE = { APPROVED: "approved", CHANGES_REQUESTED: "changes requested", COMMENTED: "commented", DISMISSED: "dismissed" };
+  /**
+   * Where the approvals stand, from the pull request's reviews on GitHub: { pending, people, warning, error }.
+   * pending: who has been asked and has not answered ([{ login } or { team }]). people: everyone else who
+   * reviewed, with their newest answer, and current: false when they answered before the newest change.
+   */
+  async function reviewOf(rec) {
+    if (!rec.number) return null;
+    try {
+      const [pending, reviews] = await Promise.all([github.requestedReviewers(rec.number), github.reviews(rec.number)]);
+      const newest = new Map();
+      // A comment does not replace an approval or a request for changes. Anything else does.
+      for (const r of reviews) if (r.state !== "COMMENTED" || !newest.has(r.login)) newest.set(r.login, r);
+      const waiting = new Set(pending.map((p) => p.login).filter(Boolean));
+      const people = [...newest.values()].filter((r) => !waiting.has(r.login)).map((r) => ({ login: r.login, state: REVIEW_STATE[r.state] || r.state.toLowerCase(), current: r.commit === rec.head, at: r.at, url: r.url }));
+      return { pending, people, warning: rec.reviewWarning || null };
+    } catch (e) {
+      return { pending: [], people: [], warning: rec.reviewWarning || null, error: `The console could not read the reviews: ${e.message}` };
+    }
   }
 
   /** { proposal, base, notice }. base is the design system at the proposal's newest commit, or null with no proposal. */
   async function status() {
     const rec = await refresh();
-    return { proposal: view(rec), base: rec ? await stateAt(rec.head) : null, notice: await load("notice") };
+    const proposal = view(rec);
+    if (proposal) proposal.review = await reviewOf(rec);
+    return { proposal, base: rec ? await stateAt(rec.head) : null, notice: await load("notice") };
   }
 
   function body(rec, liveVersion) {
@@ -197,6 +222,12 @@ export function createProposals({ github, store, edits, kv, base = "main", previ
       rec.draft = false;
     }
     rec.submitted = true;
+    // Ask the usual reviewers. If GitHub will not ask someone, like a login with no access to the repository, the
+    // proposal is still submitted, and the console says who could not be asked.
+    if (reviewers.length) {
+      try { await github.requestReviewers(rec.number, reviewers); rec.reviewWarning = null; }
+      catch (e) { rec.reviewWarning = `GitHub did not ask ${reviewers.join(", ")} to review: ${(e.github && e.github.message) || e.message}. Ask them on the pull request, and check that they can see the repository.`; }
+    }
     await keep("proposal", rec);
     return status();
   }

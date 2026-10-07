@@ -6,6 +6,7 @@
 // Nobody can review a pull request here, so two addresses do what a reviewer and the Release workflow would:
 //   POST /_local/pulls/<number>/merge   lands it: merges it, and releases the version its changesets call for
 //   POST /_local/pulls/<number>/close   withdraws it
+//   POST /_local/pulls/<number>/review?login=sam&state=APPROVED   reviews it (APPROVED, CHANGES_REQUESTED, COMMENTED)
 import http from "node:http";
 import { sampleRepo } from "../test/helpers/sample-repo.mjs";
 
@@ -21,12 +22,13 @@ export async function startFakeGitHub(dir, { onChange, draftPRs = true } = {}) {
   const github = sampleRepo({ repo: FAKE_REPO, token: FAKE_TOKEN, draftPRs }, dir);
   const server = http.createServer(async (req, res) => {
     const chunks = []; for await (const c of req) chunks.push(c);
-    const local = req.method === "POST" && req.url.match(/^\/_local\/pulls\/(\d+)\/(merge|close)$/);
+    const local = req.method === "POST" && req.url.match(/^\/_local\/pulls\/(\d+)\/(merge|close|review)(?:\?(.*))?$/);
     if (local) {
       const pr = github.pull(+local[1]);
       if (!pr || pr.state !== "open") { res.writeHead(404, { "content-type": "application/json" }); res.end(JSON.stringify({ error: "There is no open pull request with that number." })); return; }
       let out;
       if (local[2] === "close") { github.close(pr.number); out = { closed: pr.number }; }
+      else if (local[2] === "review") { const q = new URLSearchParams(local[3] || ""); const login = q.get("login") || "reviewer", state = (q.get("state") || "APPROVED").toUpperCase(); github.review(pr.number, login, state); out = { reviewed: pr.number, login, state }; }
       else { const version = landedVersion(github, pr); github.merge(pr.number, { release: version }); clearChangesets(github); out = { merged: pr.number, version }; }
       res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify(out)); return;
     }
