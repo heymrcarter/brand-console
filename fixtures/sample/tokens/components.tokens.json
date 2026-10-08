@@ -947,6 +947,247 @@
           "guidance": "Summarize the terms in plain words at the top. Let people download the full text. Say that typing their name is their signature. Show the date."
         }
       }
+    },
+    "ai-label": {
+      "$description": "The mark and the approved words that say AI made something, like an answer or a summary.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "AI label",
+          "category": "ai",
+          "level": "Primitive",
+          "settings": {
+            "words": "AI answer",
+            "style": "plain"
+          },
+          "guidance": "Put the AI label on everything AI wrote: answers, summaries, and suggested words. Never show the mark without the words. Never hide it in a tooltip."
+        }
+      }
+    },
+    "ai-message": {
+      "$description": "One turn in a conversation with AI: what the person asked, or what the AI answered, with Copy and Try again.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "AI message",
+          "category": "ai",
+          "level": "Component",
+          "settings": {
+            "look": "tint",
+            "avatar": "show"
+          },
+          "guidance": "Keep answers short and in plain words. Every AI answer shows the AI label. Show sources when the answer comes from the member's plan or records."
+        }
+      }
+    },
+    "prompt-box": {
+      "$description": "Where people type a question for AI. It grows as they type, sends, and can stop an answer.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Prompt box",
+          "category": "ai",
+          "level": "Component",
+          "settings": {
+            "send": "words",
+            "privacy": "Do not share passwords or card numbers."
+          },
+          "guidance": "Say what the AI can help with in the label or help text. Keep the privacy note. Never send what people typed until they press Send."
+        }
+      }
+    },
+    "ai-status": {
+      "$description": "What the AI is doing while people wait, like \"Looking up your plan\", with the steps it has done.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Working status",
+          "category": "ai",
+          "level": "Component",
+          "settings": {
+            "steps": "show"
+          },
+          "guidance": "Name what the AI is doing in plain words, like \"Looking at your claims\". Never show a spinner with no words."
+        }
+      }
+    },
+    "ai-sources": {
+      "$description": "Where an answer came from: numbered marks in the answer, and a card for each source.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Sources",
+          "category": "ai",
+          "level": "Component",
+          "settings": {
+            "style": "cards"
+          },
+          "guidance": "Show sources for answers about the member's plan, costs, or records. Name the source the way people know it, like \"Your 2026 plan document, page 12\"."
+        }
+      }
+    },
+    "ai-feedback": {
+      "$description": "Lets people say if an answer helped, why not, and report a problem.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Feedback",
+          "category": "ai",
+          "level": "Component",
+          "settings": {
+            "reasons": "show"
+          },
+          "guidance": "Put feedback under each AI answer. Keep it to one question. Use what people say to make the AI better, and say so in your privacy notice."
+        }
+      }
+    },
+    "ai-handoff": {
+      "$description": "The way to reach a person instead of AI: phone, chat with a person, or a message, with the hours.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Talk to a person",
+          "category": "ai",
+          "level": "Component",
+          "settings": {
+            "words": "Talk to a person",
+            "phone": "1-800-555-0142",
+            "hours": "Every day, 8 AM to 8 PM",
+            "look": "card"
+          },
+          "guidance": "Every AI feature offers a person, never more than one step away. Put it in the assistant panel and after any answer the AI could not give."
+        }
+      }
+    },
+    "ai-notice": {
+      "$description": "The approved words about what AI can get wrong, and the reply for an emergency.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Limits notice",
+          "category": "ai",
+          "level": "Component",
+          "settings": {
+            "limits": "AI can make mistakes. Check important information. For medical advice, ask your doctor.",
+            "emergency": "If this is an emergency, call 911 or go to the nearest emergency room. If you are thinking about hurting yourself, call or text 988.",
+            "emergencyPhone": "911"
+          },
+          "guidance": "Show the limits notice wherever people can ask AI something. When words suggest an emergency or harm, show the emergency reply instead of an AI answer. Never let AI write these words."
+        }
+      }
+    },
+    "prompt-suggestions": {
+      "$description": "Questions people can tap to start, like \"What is my deductible?\"",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Suggested questions",
+          "category": "ai",
+          "level": "Component",
+          "settings": {
+            "look": "chips"
+          },
+          "guidance": "Offer three to five questions people really ask, written the way they would say them. Change them to fit the page, like costs on a claim page."
+        }
+      }
+    },
+    "ai-action": {
+      "$description": "Something the AI wants to do for people, like booking a visit, as a card they confirm first. Nothing happens until they do.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Action check",
+          "category": "ai",
+          "level": "Composite",
+          "settings": {
+            "confirm": "Yes, do this"
+          },
+          "guidance": "AI never books, sends, pays, or changes anything on its own. Show every detail that matters, like the date, time, place, and cost. Let people change it or say not now."
+        }
+      }
+    },
+    "ai-summary": {
+      "$description": "A summary written by AI on a normal page, like a claim or visit notes in plain words, with how it was made.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "AI summary",
+          "category": "ai",
+          "level": "Component",
+          "settings": {
+            "words": "AI summary",
+            "start": "open"
+          },
+          "guidance": "Put the summary above the full details, never instead of them. Say what it was made from. Keep the original one tap away."
+        }
+      }
+    },
+    "ai-panel": {
+      "$description": "The way into the assistant: a button that opens a side panel with the conversation, the prompt box, and a way to reach a person.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Assistant panel",
+          "category": "ai",
+          "level": "Composite",
+          "settings": {
+            "launcher": "button"
+          },
+          "guidance": "Use one assistant panel per app. It always shows the limits notice and a way to reach a person."
+        }
+      }
+    },
+    "ai-unavailable": {
+      "$description": "What shows when AI cannot help: it cannot answer, the question is outside what it does, or it is not working right now.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "AI unavailable",
+          "category": "ai",
+          "level": "Component",
+          "settings": {},
+          "guidance": "Say plainly that AI cannot help with this, and give the next step: try again, ask something else, or talk to a person. Never leave people stuck."
+        }
+      }
+    },
+    "ai-rewrite": {
+      "$description": "AI suggests other words for something people wrote, like plainer or shorter. They see both and pick.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Writing help",
+          "category": "ai",
+          "level": "Composite",
+          "settings": {
+            "layout": "side"
+          },
+          "guidance": "Most useful in associate tools, like a note to a member. Never replace people's words without them pressing Use this."
+        }
+      }
+    },
+    "ai-review": {
+      "$description": "Changes AI suggests to a form or a note, one field at a time. People accept or turn down each one.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Suggested change",
+          "category": "ai",
+          "level": "Composite",
+          "settings": {},
+          "guidance": "Show only what changes. Keep people's own words unless they accept. Never accept a change for them."
+        }
+      }
+    },
+    "ai-history": {
+      "$description": "Past conversations with the assistant, to open again or delete.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Conversation history",
+          "category": "ai",
+          "level": "Component",
+          "settings": {},
+          "guidance": "Say how long conversations are kept. Let people delete any of them."
+        }
+      }
+    },
+    "ai-voice": {
+      "$description": "Talk to the assistant and hear answers, with the words always shown on screen too.",
+      "$extensions": {
+        "org.brand-console": {
+          "name": "Voice",
+          "category": "ai",
+          "level": "Component",
+          "settings": {
+            "readAloud": "off"
+          },
+          "guidance": "Offer voice next to typing, never instead of it. Show what was heard before sending it."
+        }
+      }
     }
   }
 }

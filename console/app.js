@@ -19,10 +19,12 @@ const S={
 };
 
 function showVal(p,v){
+  const ai=p.match(/^brands\.[^.]+\.ai\.(color|name|picture)$/);
+  if(ai){const list={color:AI_SOURCES,picture:AI_PICTURES}[ai[1]];if(list) return esc((list.find(([x])=>x===(v??list[0][0]))||list[0])[1]);return v&&String(v).trim()?esc(`"${v}"`):`<span class="under">Assistant</span>`;}
   if(v===undefined) return `<span class="under">None</span>`;
   if(typeof v==="string"&&hexOk(v)&&v.startsWith("#")) return `<span class="sw" style="background:${v}"></span>${v}`;
   if(p.startsWith("guidance")) return "new text";
-  if(p.startsWith("comp.")){const ks=p.split(".");const sl=slotOf(ks[1],ks[2]);const o=sl&&sl.opts.find(([x])=>String(x)===String(v));if(o) return esc(o[1]);}
+  if(p.startsWith("comp.")){const ks=p.split(".");const sl=slotOf(ks[1],ks[2]);if(sl&&sl.type==="text") return esc(`"${String(v).length>60?String(v).slice(0,57)+"…":v}"`);const o=sl&&sl.opts&&sl.opts.find(([x])=>String(x)===String(v));if(o) return esc(o[1]);}
   if(p.endsWith(".radius")&&RADII[v]) return RADII[v];
   if(ROLE_LABEL[v]) return ROLE_LABEL[v];
   if(p==="shape.radius") return v+" px";
@@ -148,7 +150,7 @@ function pvControls(){
 /* Real React components, rendered by Storybook */
 /* Every component has a real React story in Storybook. Its id comes from the story title, which is the component name. */
 const STORY_FIX={"date-input":"components-date-input",badge:"components-badge",dialog:"components-dialog",icon:"foundations-icons"};
-const STORY=Object.fromEntries(REG_ORDER.map(id=>[id,STORY_FIX[id]||"components-"+REG[id].name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")]));
+const STORY=Object.fromEntries(REG_ORDER.map(id=>[id,STORY_FIX[id]||(REG[id].cat==="ai"?"ai-":"components-")+REG[id].name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")]));
 function storyFrame(kind){const u=S.ui;const g=`brand:${u.brand};screen:${u.ctx};size:${u.size};mode:${u.mode}`;
   return `<div class="sbframe${u.vp==="phone"?" phone":""}"><iframe title="${esc(REG[kind].name)} in Storybook" src="${esc(S.storybook)}/iframe.html?id=${STORY[kind]}--all&viewMode=story&globals=${g}"></iframe></div><p class="under" style="margin-top:8px">This is the real React component running in Storybook. It updates a moment after your change is saved. If it is blank, Storybook may still be starting.</p>`;}
 /* Big pictures are kept as short blob links in the preview, so the page stays fast. */
@@ -399,6 +401,7 @@ function secColor(){
     </div>
     ${bgBox(b)}
     ${palBox(b)}
+    ${aiBox(b)}
     <div class="box"><div class="bt">Word and background pairs for ${bn(b)} in ${S.ui.mode==="dark"?"dark":"light"} mode</div><div class="bs">The rule is 4.5 to 1 for words and 3 to 1 for outlines. For readers over 65, 7 to 1 is best. Pick colors for any pair to see its score as you click.</div>
       <div class="field"><span class="fl">Mode you are editing</span>${seg("ui.mode",md,[["light","Light mode"],["dark","Dark mode"]],{label:"Mode you are editing"})}</div>
       <div class="field"><span class="fl">Contrast goal for words</span>${seg("brands."+b+".wordGoal",best?"best":"rule",[["rule","Meet the rule: 4.5 to 1"],["best","Best for older readers: 7 to 1"]],{label:"Contrast goal for words"})}<span class="hint">The goal sets how dark links, help text, tag words, and error words are. Your brand colors stay the same. The main button is different. You set its color and words in its own row below.</span></div>
@@ -414,6 +417,25 @@ function secColor(){
 const RADIX={gray:"FCFCFC,F9F9F9,F0F0F0,E8E8E8,E0E0E0,D9D9D9,CECECE,BBBBBB,8D8D8D,838383,646464,202020",mauve:"FDFCFD,FAF9FB,F2EFF3,EAE7EC,E3DFE6,DBD8E0,D0CDD7,BCBAC7,8E8C99,84828E,65636D,211F26",slate:"FCFCFD,F9F9FB,F0F0F3,E8E8EC,E0E1E6,D9D9E0,CDCED6,B9BBC6,8B8D98,80838D,60646C,1C2024",sage:"FBFDFC,F7F9F8,EEF1F0,E6E9E8,DFE2E0,D7DAD9,CBCFCD,B8BCBA,868E8B,7C8481,5F6563,1A211E",olive:"FCFDFC,F8FAF8,EFF1EF,E7E9E7,DFE2DF,D7DAD7,CCCFCC,B9BCB8,898E87,7F847D,60655F,1D211C",sand:"FDFDFC,F9F9F8,F1F0EF,E9E8E6,E2E1DE,DAD9D6,CFCECA,BCBBB5,8D8D86,82827C,63635E,21201C",tomato:"FFFCFC,FFF8F7,FEEBE7,FFDCD3,FFCDC2,FDBDAF,F5A898,EC8E7B,E54D2E,DD4425,D13415,5C271F",red:"FFFCFC,FFF7F7,FEEBEC,FFDBDC,FFCDCE,FDBDBE,F4A9AA,EB8E90,E5484D,DC3E42,CE2C31,641723",ruby:"FFFCFD,FFF7F8,FEEAED,FFDCE1,FFCED6,F8BFC8,EFACB8,E592A3,E54666,DC3B5D,CA244D,64172B",crimson:"FFFCFD,FEF7F9,FFE9F0,FEDCE7,FACEDD,F3BED1,EAACC3,E093B2,E93D82,DF3478,CB1D63,621639",pink:"FFFCFE,FEF7FB,FEE9F5,FBDCEF,F6CEE7,EFBFDD,E7ACD0,DD93C2,D6409F,CF3897,C2298A,651249",plum:"FEFCFF,FDF7FD,FBEBFB,F7DEF8,F2D1F3,E9C2EC,DEADE3,CF91D8,AB4ABA,A144AF,953EA3,53195D",purple:"FEFCFE,FBF7FE,F7EDFE,F2E2FC,EAD5F9,E0C4F4,D1AFEC,BE93E4,8E4EC6,8347B9,8145B5,402060",violet:"FDFCFE,FAF8FF,F4F0FE,EBE4FF,E1D9FF,D4CAFE,C2B5F5,AA99EC,6E56CF,654DC4,6550B9,2F265F",iris:"FDFDFF,F8F8FF,F0F1FE,E6E7FF,DADCFF,CBCDFF,B8BAF8,9B9EF0,5B5BD6,5151CD,5753C6,272962",indigo:"FDFDFE,F7F9FF,EDF2FE,E1E9FF,D2DEFF,C1D0FF,ABBDF9,8DA4EF,3E63DD,3358D4,3A5BC7,1F2D5C",blue:"FBFDFF,F4FAFF,E6F4FE,D5EFFF,C2E5FF,ACD8FC,8EC8F6,5EB1EF,0090FF,0588F0,0D74CE,113264",cyan:"FAFDFE,F2FAFB,DEF7F9,CAF1F6,B5E9F0,9DDDE7,7DCEDC,3DB9CF,00A2C7,0797B9,107D98,0D3C48",teal:"FAFEFD,F3FBF9,E0F8F3,CCF3EA,B8EAE0,A1DED2,83CDC1,53B9AB,12A594,0D9B8A,008573,0D3D38",jade:"FBFEFD,F4FBF7,E6F7ED,D6F1E3,C3E9D7,ACDEC8,8BCEB6,56BA9F,29A383,26997B,208368,1D3B31",green:"FBFEFC,F4FBF6,E6F6EB,D6F1DF,C4E8D1,ADDDC0,8ECEAA,5BB98B,30A46C,2B9A66,218358,193B2D",grass:"FBFEFB,F5FBF5,E9F6E9,DAF1DB,C9E8CA,B2DDB5,94CE9A,65BA74,46A758,3E9B4F,2A7E3B,203C25",bronze:"FDFCFC,FDF7F5,F6EDEA,EFE4DF,E7D9D3,DFCDC5,D3BCB3,C2A499,A18072,957468,7D5E54,43302B",gold:"FDFDFC,FAF9F2,F2F0E7,EAE6DB,E1DCCF,D8D0BF,CBC0AA,B9A88D,978365,8C7A5E,71624B,3B352B",brown:"FEFDFC,FCF9F6,F6EEE7,F0E4D9,EBDACA,E4CDB7,DCBC9F,CEA37E,AD7F58,A07553,815E46,3E332E",orange:"FEFCFB,FFF7ED,FFEFD6,FFDFB5,FFD19A,FFC182,F5AE73,EC9455,F76B15,EF5F00,CC4E00,582D1D",amber:"FEFDFB,FEFBE9,FFF7C2,FFEE9C,FBE577,F3D673,E9C162,E2A336,FFC53D,FFBA18,AB6400,4F3422",yellow:"FDFDF9,FEFCE9,FFFAB8,FFF394,FFE770,F3D768,E4C767,D5AE39,FFE629,FFDC00,9E6C00,473B1F",lime:"FCFDFA,F8FAF3,EEF6D6,E2F0BD,D3E7A6,C2DA91,ABC978,8DB654,BDEE63,B0E64C,5C7C2F,37401C",mint:"F9FEFD,F2FBF9,DDF9F2,C8F4E9,B3ECDE,9CE0D0,7ECFBD,4CBBA5,86EAD4,7DE0CB,027864,16433C",sky:"F9FEFF,F1FAFD,E1F6FD,D1F0FA,BEE7F5,A9DAED,8DCAE3,60B3D7,7CE2FE,74DAF8,00749E,1D3E56"};
 const RADIX_NAMES=Object.keys(RADIX);
 const capWord=t=>t.charAt(0).toUpperCase()+t.slice(1);
+/* Words people type that every app shows the same way, like the AI limits notice. They count toward a limit and
+   are never written by the helper. */
+function wordsField(path,val,sl){
+  const v=String(val??sl.def??""),id="w-"+path.replace(/[^a-z0-9]+/gi,"-"),long=(sl.max||0)>60;
+  if(!canEdit()) return `<div class="field"><span class="fl">${esc(sl.label)}</span><div style="font-size:13px;line-height:1.6">${esc(v)}</div></div>`;
+  const box=long?`<textarea class="inp" id="${id}" data-text="${path}" rows="3" maxlength="${sl.max}">${esc(v)}</textarea>`:`<input class="inp" id="${id}" data-text="${path}" value="${esc(v)}" maxlength="${sl.max}">`;
+  return `<div class="field"><label class="fl" for="${id}">${esc(sl.label)}</label>${box}<span class="hint">${sl.hint?esc(sl.hint)+" ":""}Up to ${sl.max} letters. Every app shows these exact words, so changes go through review like any other change.${v.trim()?"":" These words cannot be empty."}</span></div>`;
+}
+/* How AI looks and what the assistant is called, for one brand. */
+function aiBox(b){
+  const br=S.draft.brands[b], a=aiOf(br), ed=canEdit(), md=S.ui.mode, c=colorsFor(S.draft,b,md), id="ai-name-"+b;
+  const sw=(hex,n)=>`<span class="aisw"><span class="sw" style="background:${hex}"></span>${n} ${hex}</span>`;
+  return `<div class="box"><div class="bt">AI for ${bn(b)}</div><div class="bs">AI answers, summaries, and suggestions use their own color, made from one of your brand colors, so people can tell what AI wrote. The console checks it like every other color.</div>
+    <div class="field"><span class="fl">Make the AI color from</span>${seg(`brands.${b}.ai.color`,a.color,AI_SOURCES,{label:"Make the AI color from",dis:!ed})}
+      <div class="aisample" style="background:${c.aiSoft};color:${c.aiFg};border-inline-start:4px solid ${c.ai}"><b style="color:${c.ai}">${AI_MARK} ${esc(S.draft.comp["ai-label"].words||"AI answer")}</b><span>Your deductible is $2,000 a year.</span></div>
+      <div class="aisws">${sw(c.ai,"AI color")}${sw(c.aiSoft,"AI background")}${sw(c.aiFg,"Words on it")}</div><span class="hint">Shown for ${md} mode.</span></div>
+    <div class="field"><label class="fl" for="${id}">The assistant's name</label>${ed?`<input class="inp" id="${id}" data-text="brands.${b}.ai.name" value="${esc(a.name)}" maxlength="30" placeholder="Assistant">`:`<div>${esc(aiName(br))}</div>`}<span class="hint">Leave it empty to call it "Assistant". People see it on the button that opens the assistant and before every answer.</span></div>
+    <div class="field"><span class="fl">The assistant's picture</span>${seg(`brands.${b}.ai.picture`,a.picture,AI_PICTURES,{label:"The assistant's picture",dis:!ed})}</div></div>`;
+}
 function palBox(b){
   const br=S.draft.brands[b], pal=br.palette, ed=canEdit();
   if(!pal) return `<div class="box"><div class="bt">Full color set for ${bn(b)}</div><div class="bs">${bn(b)} does not have a color set yet. It uses the main, second, and accent colors above.</div>${ed?`<div style="display:flex;flex-direction:column;gap:6px"><div class="btns">${btn("Start a color set","palStart",{p:1,s:1,data:{b}})}</div><div class="under">I will start it with your main, second, and accent colors. Then you can add more colors.</div></div>`:""}</div>`;
@@ -611,6 +633,7 @@ function lvlPill(l){return `<span class="lvl ${l}">${{Primitive:"Primitive",Comp
 function secComp(k){
   const RR=REG[k], C=S.draft.comp[k]||{};
   const slots=(RR.slots||[]).map(sl=>k==="button"&&sl.k==="bg"?`<div class="field"><span class="fl">${esc(sl.label)}</span>${btnPicker(S.ui.brand)}</div>`
+    :sl.type==="text"?wordsField(`comp.${k}.${sl.k}`,C[sl.k],sl)
     :`<div class="field"><span class="fl">${esc(sl.label)}</span>${seg(`comp.${k}.${sl.k}`,C[sl.k],sl.opts)}${sl.hint?`<span class="hint">${esc(sl.hint)}</span>`:""}</div>`).join("");
   const g=S.draft.guidance[k]||"";
   const from=(RR.from||[]).filter(id=>REG[id]);
@@ -914,7 +937,10 @@ const ALLOWED=[
   [/^type\.lineHeight$/,v=>[1.4,1.5,1.6].includes(+v)?+v:null],
   [/^shape\.radius$/,v=>(+v>=0&&+v<=20)?Math.round(+v):null],
   [/^shape\.shadow$/,v=>["none","soft","strong"].includes(v)?v:null],
-  ...REG_ORDER.flatMap(id=>(REG[id].slots||[]).map(sl=>[new RegExp(`^comp\\.${id.replace(/-/g,"\\-")}\\.${sl.k}$`),v=>{const o=sl.opts.find(([x])=>String(x)===String(v));return o?o[0]:null;}]))];
+  [/^brands\.([a-z][a-z0-9-]*)\.ai\.color$/,v=>AI_SOURCES.some(([x])=>x===v)?v:null],
+  [/^brands\.([a-z][a-z0-9-]*)\.ai\.picture$/,v=>AI_PICTURES.some(([x])=>x===v)?v:null],
+  /* Approved words (text settings, like the AI limits notice) and the assistant's name are only typed by people. */
+  ...REG_ORDER.flatMap(id=>(REG[id].slots||[]).filter(sl=>sl.opts).map(sl=>[new RegExp(`^comp\\.${id.replace(/-/g,"\\-")}\\.${sl.k}$`),v=>{const o=sl.opts.find(([x])=>String(x)===String(v));return o?o[0]:null;}]))];
 function cleanChanges(list){const out=[];(Array.isArray(list)?list:[]).slice(0,6).forEach(c=>{if(!c||typeof c.path!=="string")return;
   const mb=c.path.match(/^brands\.([^.]+)\./);if(mb&&!Object.hasOwn(S.draft.brands,mb[1]))return;
   for(const [re,fn] of ALLOWED){if(re.test(c.path)){const v=fn(c.value);if(v!==null&&v!==getP(S.draft,c.path)) out.push({path:c.path,value:v,why:String(c.why||"").slice(0,240)});return;}}});return out;}
@@ -949,7 +975,9 @@ Allowed change paths and values:
 - type.heading, type.body, type.ui (labels, navigation, and buttons): one of ${Object.keys(FONTS).map(f=>`"${f}" (${FONTS[f].role==="best"?"easiest to read":FONTS[f].role==="heading"?"large headings only":FONTS[f].role==="label"?"labels and numbers only":"good for reading"}, ${FONTS[f].cat}${FONTS[f].licensed?", needs a license":""})`).join(", ")}. For body text, strongly prefer fonts marked easiest to read.
 - type.scale: 1.2 | 1.25 | 1.333 ; type.headingWeight: 600|700|800 ; type.lineHeight: 1.4|1.5|1.6
 - shape.radius: 0-20 ; shape.shadow: "none"|"soft"|"strong"
-${REG_ORDER.filter(id=>(REG[id].slots||[]).length).map(id=>`- comp.${id} (${REG[id].name}): ${REG[id].slots.map(sl=>`${sl.k} = ${sl.opts.map(([v])=>JSON.stringify(v)).join("|")}`).join(" ; ")}`).join("\n")}
+${REG_ORDER.filter(id=>(REG[id].slots||[]).some(sl=>sl.opts)).map(id=>`- comp.${id} (${REG[id].name}): ${REG[id].slots.filter(sl=>sl.opts).map(sl=>`${sl.k} = ${sl.opts.map(([v])=>JSON.stringify(v)).join("|")}`).join(" ; ")}`).join("\n")}
+- brands.<id>.ai.color: ${AI_SOURCES.map(([v,l])=>`"${v}" (${l.toLowerCase()})`).join(" | ")}. The AI color is made from this brand color. brands.<id>.ai.picture: ${AI_PICTURES.map(([v])=>`"${v}"`).join(" | ")}.
+Never propose approved words, like the AI label, limits notice, emergency reply, or handoff words, or the assistant's name. People type and review those themselves. If asked, say where to change them.
 Spacing and size numbers belong to the admin team. If asked about them, explain and suggest the person ask the admin team; do not propose a change.
 When you suggest a color, make sure white or dark text on it will pass 4.5:1. If the brand has an official color set, choose colors from that set and respect its order of importance. Otherwise keep the brand's hue family.
 Write "reply" at a fifth-grade reading level: short, full sentences, plain words, no jargon, no lists, no markdown. Two to four sentences.
