@@ -8,7 +8,7 @@ The design system is its own repository, [heymrcarter/design-system](https://git
 
 ## What you need
 
-- **Node.js, version 22.12 or newer.** Get it free at https://nodejs.org (pick the "LTS" version, 22 or 24). To check, open a terminal and type `node -v`.
+- **Node.js, version 22.13 or newer.** Get it free at https://nodejs.org (pick the "LTS" version, 22 or 24). To check, open a terminal and type `node -v`.
 - **A GitHub token that can read packages**, because the design system packages are private. If you use the GitHub CLI, run `gh auth refresh -s read:packages`, then put this line in your user `~/.npmrc` (not in the project): `//npm.pkg.github.com/:_authToken=` followed by the output of `gh auth token`.
 - A web browser. Chrome, Edge, or Safari work best, because they can turn your voice into text.
 
@@ -30,6 +30,10 @@ This runs the real Worker, the same code as on Cloudflare, in `wrangler dev`. It
 To stop, go back to the terminal and press **Ctrl + C**.
 
 To run against a real GitHub repository instead, copy `.dev.vars.example` to `.dev.vars`, fill it in, and run `npm run worker:dev`.
+
+### Without Cloudflare: a plain Node process
+
+`npm run local` runs the same console as a plain Node server: no wrangler, no Durable Object, and no Cloudflare Access sign-in. It answers only on this computer, keeps the edits in a SQLite file in `.local-data/`, and reads its settings from `.env` (see `.env.example`). `npm run local:sample` does the same against the sample design system. On a computer that gets packages from the company's Artifactory, install with `npm run install:artifactory` instead of `npm install`. The steps are in `docs/local-node.md`.
 
 ## Connect the design guide to Claude (optional)
 
@@ -110,17 +114,18 @@ The console runs on Cloudflare Workers, with the design system in a GitHub repos
 | Folder or file | What it holds |
 |---|---|
 | `console/` | The console screen. `app.js` is the screen, `index.html` its styles, and `engine-globals.js` puts the design system's engine on the page. |
-| `server/` | What the Worker runs to save edits, make proposals, roll back, and talk to Figma: the API, the store, proposals (`proposals.mjs`, with `github-client.mjs`), and the Figma sync. They read and write files only through `server/storage/`: GitHub with a Durable Object online, and the project folder or memory for scripts and tests. `server/engine.mjs` loads the engine from the package. |
+| `server/` | What the Worker runs to save edits, make proposals, roll back, and talk to Figma: the API, the store, proposals (`proposals.mjs`, with `github-client.mjs`), and the Figma sync. They read and write files only through `server/storage/`: GitHub with SQLite for the edits, and the project folder or memory for scripts and tests. `console.mjs` puts them together, and `http.mjs` holds the request rules; the Worker and the Node server (`node-server.mjs`) both use them. `server/engine.mjs` loads the engine from the package. |
 | `worker/` | The console on Cloudflare Workers: the Worker, the Durable Object that holds the edits and the open proposal, and the Cloudflare Access sign-in check. `wrangler.jsonc` is its settings. |
 | `fixtures/sample/` | The sample design system the tests and `npm start` use, shaped like the design system repository: `tokens/` (main), `history/` (earlier versions), and `releases.json`. `test/helpers/sample-repo.mjs` turns it into a GitHub stand-in. |
 | `scripts/` | Running the console on your computer, the Worker test, the deploy, the prototype build, and the browser checks. |
 | `test/` | The automatic tests. |
 | `docs/cloudflare.md` | Putting the console online, and deploying it. |
+| `docs/local-node.md` | Running the console as a plain Node process, with packages from Artifactory. |
 
 ## How it works
 
 - **One engine:** The console runs the design system's engine, `@heymrcarter/design-system/engine`, at the version in `package.json`. The server code and the Worker import it through `server/engine.mjs`. A browser cannot import a package by name, so the asset build and the prototype build bundle `console/engine-globals.js` into one script that puts the engine's names on the page. `app.js` is still a plain script that uses those names directly. Once it imports what it needs, `engine-globals.js` can go.
-- **One storage:** `server/store.mjs` and `server/figma.mjs` never touch the disk. They read and save through a small storage interface (`server/storage/storage.mjs`): read, write, list, remove, and commit. Online, the storage is the design system repository's main branch on GitHub (`github.mjs`), with the edits waiting on top of it in a Durable Object (`worker/durable-storage.mjs`). The edits never go to main from here. A second storage reads main alone: that is **live**, with the version in its `package.json`. `disk.mjs` and `memory.mjs` are for scripts and tests. Store calls are async, and they run one at a time.
+- **One storage:** `server/store.mjs` and `server/figma.mjs` never touch the disk. They read and save through a small storage interface (`server/storage/storage.mjs`): read, write, list, remove, and commit. Online, the storage is the design system repository's main branch on GitHub (`github.mjs`), with the edits waiting on top of it in SQLite (`sql.mjs`): the Durable Object's online, or a file with the Node server. The edits never go to main from here. A second storage reads main alone: that is **live**, with the version in its `package.json`. `disk.mjs` and `memory.mjs` are for scripts and tests. Store calls are async, and they run one at a time.
 - **Proposals** (`server/proposals.mjs`): **Add to proposal** turns the edits into one commit on a proposal branch, with a changeset (`.changeset/*.md`) that holds the change's bump and note. The first change opens a draft pull request, or, if the repository's plan has no draft pull requests, keeps the branch in the console until **Submit**, which opens the pull request. Each change is built on the newest main, plus the proposal's earlier commits, plus the edits, so there are never merge conflicts: for the files the console writes, its version wins. The console checks the pull request each time it loads, so it knows when the proposal has landed or been withdrawn. When it lands, the design system's Release workflow releases the version on its own; the console never releases anything. To undo a change, the console puts its earlier values back as edits, to add as a new change. History is never rewritten.
 - **Working together live.** Everyone shares one set of edits. Each open console keeps a live connection (`/api/live`, a WebSocket to the Durable Object; `server/live.mjs` is the room, and does not depend on Cloudflare). Someone's save reaches everyone else in about a second, and the top bar shows who else is here and on which page. Each save says which version of the edits it was made on; if others saved since, only that save's changes are applied on top of theirs (`server/merge.mjs`: per setting, the newest change wins), so nobody's work is overwritten. Other changes (a change added to the proposal, a Figma sync, a rollback) make the other pages reload the state.
 - **Approvals happen on GitHub.** Reviewers approve on the pull request. The Proposal page shows where they stand: who approved (and whether it was before the newest change), who asked for changes, and whose review is still pending. Submitting a proposal asks the people in the `REVIEWERS` setting.

@@ -4,7 +4,7 @@
 //   refresh    "something else changed" (a change added to the proposal, a Figma sync, a rollback), so pages reload
 //              the console's state
 // It does not know how the connections work. The Cloudflare Durable Object gives it WebSockets
-// (worker/design-system.mjs); another server could give it its own, and nothing here would change.
+// (worker/design-system.mjs), and the Node server gives it the ws package's (server/node-server.mjs).
 //
 // transport: { all(): connections, send(conn, text), info(conn), setInfo(conn, info) }. info is what the room keeps
 // about a connection ({ page, email, name, sec, brand }). It must last as long as the connection, even if the

@@ -1,15 +1,16 @@
-// Storage and secrets inside a Durable Object's SQLite database. See server/storage/storage.mjs for the interface.
-// The Worker uses this as the pending storage that holds changes until a publish commits them to GitHub.
+// Storage, secrets, and small records in a SQLite database. See storage.mjs for the interface.
+// The Worker uses it on its Durable Object's SQLite (ctx.storage.sql), and the Node server on a file with Node's own
+// SQLite (sqlite-file.mjs). Either way it is the pending storage that holds the edits until a change commits them to GitHub.
 //
 // It uses the SQL API, not the key-value API, because listing keys there also loads every value, and a font can be
 // 8 MB. A row can hold at most 2 MB, so files over 1 MB are split into 1 MB chunks. A smaller file is one row.
-import { storageKey, storagePrefix } from "../server/storage/storage.mjs";
+import { storageKey, storagePrefix } from "./storage.mjs";
 
 const INLINE = 1024 * 1024, CHUNK = 1024 * 1024;
 const asBytes = (v) => (v == null ? null : v instanceof Uint8Array ? v : new Uint8Array(v));
 
 /** sql: a Durable Object's ctx.storage.sql, or anything with the same exec(query, ...bindings).toArray(). */
-export function createDurableStorage(sql) {
+export function createSqlStorage(sql) {
   sql.exec("CREATE TABLE IF NOT EXISTS files (path TEXT PRIMARY KEY, kind TEXT NOT NULL, size INTEGER NOT NULL, chunks INTEGER NOT NULL, data BLOB)");
   sql.exec("CREATE TABLE IF NOT EXISTS chunks (path TEXT NOT NULL, i INTEGER NOT NULL, data BLOB NOT NULL, PRIMARY KEY (path, i))");
   const row = (p) => sql.exec("SELECT kind, chunks, data FROM files WHERE path = ?", p).toArray()[0];
@@ -27,7 +28,7 @@ export function createDurableStorage(sql) {
   return {
     async read(p) { const f = bytesOf(storageKey(p)); return f && new TextDecoder().decode(f.bytes); },
     async readBytes(p) { const f = bytesOf(storageKey(p)); return f && f.bytes; },
-    // Every statement here runs before the next await, so the Durable Object writes them together or not at all.
+    // Every statement here runs before the next await, so a Durable Object writes them together or not at all.
     async write(p, v) {
       const k = storageKey(p);
       if (typeof v !== "string" && !(v instanceof Uint8Array)) throw new TypeError("Storage only saves text or a Uint8Array.");
@@ -60,10 +61,10 @@ export function createDurableStorage(sql) {
 }
 
 /**
- * Secrets that people set in the console, like the Figma token, kept in the Durable Object. Worker secrets
- * (wrangler secret put) cannot change while the Worker runs, so they are only the fallback here.
+ * Secrets that people set in the console, like the Figma token, kept in the database. Settings from env (Worker
+ * secrets, or the Node server's .env) cannot change while the server runs, so they are only the fallback here.
  */
-export function createDurableSecrets(sql, env = {}) {
+export function createSqlSecrets(sql, env = {}) {
   sql.exec("CREATE TABLE IF NOT EXISTS secrets (name TEXT PRIMARY KEY, value TEXT NOT NULL)");
   const named = (name) => { if (!/^[A-Z_][A-Z0-9_]*$/.test(name)) throw new Error(`That is not a valid secret name: ${name}`); return name; };
   return {
@@ -76,7 +77,7 @@ export function createDurableSecrets(sql, env = {}) {
 }
 
 /** Small records the console keeps, like the open proposal, as text by key. Empty text removes one. */
-export function createDurableKV(sql) {
+export function createSqlKV(sql) {
   sql.exec("CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
   return {
     async get(key) { const r = sql.exec("SELECT value FROM kv WHERE key = ?", String(key)).toArray()[0]; return r ? r.value : ""; },

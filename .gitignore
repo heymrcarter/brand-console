@@ -3,8 +3,10 @@ node_modules/
 storybook-static/
 coverage/
 *.tsbuildinfo
-# Secrets: the Claude key and the Figma token live here
+# Settings and secrets for npm run local (see .env.example)
 .env
+# The Node server's edits, in SQLite (npm run local)
+.local-data/
 # Logs, Mac folder files, and leftovers
 *.log
 .DS_Store
@@ -23,3 +25,5 @@ node_modules
 .dev.vars
 .worker-assets/
 *.private-key.pem
+.agents/
+.claude/
