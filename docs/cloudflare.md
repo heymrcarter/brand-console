@@ -14,7 +14,7 @@ This note is for the engineers who put the console online for the brand team. It
 
 - A Cloudflare account. The free plan works (see "Free or paid" below).
 - The design system repository, like `heymrcarter/design-system`, with its Release workflow.
-- Node.js 22.12 or newer, and this project with `npm install` done.
+- Node.js 22.13 or newer, and this project with `npm install` done.
 
 ## 1. Make a GitHub App
 

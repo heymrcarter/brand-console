@@ -1,62 +1,28 @@
 // The Brand Console on Cloudflare Workers. See docs/cloudflare.md to set it up.
 //
 // Every request comes here first, including the console's own files (run_worker_first in wrangler.jsonc), so nothing
-// is served without a Cloudflare Access sign-in. Then:
-//   /api/*                      the console's API, run by the design system's Durable Object
-//   /api/live                   the live connection (a WebSocket) to the same Durable Object
-//   /fonts/                     uploaded font files, from GitHub and the edits
-//   anything else               the console and Storybook, as static files
+// is served without a Cloudflare Access sign-in. The routes are in server/http.mjs, shared with the Node server. Here:
+//   the sign-in                 Cloudflare Access (access.mjs)
+//   the API, fonts, /api/live   the design system's Durable Object (design-system.mjs)
+//   static files                Workers static assets
 import { createAccess } from "./access.mjs";
+import { handleRequest } from "../server/http.mjs";
 
 export { DesignSystem } from "./design-system.mjs";
 
-const TYPES = { css: "text/css; charset=utf-8", json: "application/json", js: "text/javascript; charset=utf-8", svg: "image/svg+xml", png: "image/png", woff2: "font/woff2", woff: "font/woff", ttf: "font/ttf", otf: "font/otf", md: "text/markdown; charset=utf-8" };
-const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
-const MAX_BODY = 20e6; // The same as the Node server. A font upload is at most 8 MB, about 11 MB as text.
-
 export default {
   async fetch(request, env) {
-    const url = new URL(request.url);
-    const isApi = url.pathname.startsWith("/api/");
-    let user;
-    try {
-      user = await createAccess({ teamDomain: env.TEAM_DOMAIN, aud: env.POLICY_AUD, localDev: env.ACCESS_LOCAL_DEV }).identify(request);
-    } catch (e) {
-      return isApi ? json(e.status || 403, { error: e.message }) : new Response(e.message, { status: e.status || 403, headers: { "content-type": "text/plain; charset=utf-8" } });
-    }
-    // Only the console's own pages may change things. Another site cannot use a signed-in person's browser to.
-    if (!["GET", "HEAD"].includes(request.method) && request.headers.get("origin") !== url.origin) {
-      return json(403, { error: "Only the Brand Console can make changes here." });
-    }
     const designSystem = env.DESIGN_SYSTEM.getByName(`${env.GITHUB_REPO || "unset"}#${env.GITHUB_BRANCH || "main"}`);
-
-    // The live connection: others' edits and who is here, without reloading. A WebSocket is a GET, so it gets its own
-    // address check: another site must not open one with a signed-in person's browser.
-    if (url.pathname === "/api/live") {
-      if (request.headers.get("upgrade") !== "websocket") return json(426, { error: "This address is for the console's live connection." });
-      if (request.headers.get("origin") !== url.origin) return json(403, { error: "Only the Brand Console can open a live connection." });
-      const headers = new Headers(request.headers);
-      headers.set("x-console-user", JSON.stringify({ email: user.email, name: user.name || "" }));
-      return designSystem.fetch(new Request(request, { headers }));
-    }
-
-    if (isApi) {
-      let body = {};
-      if (!["GET", "HEAD"].includes(request.method)) {
-        const text = await request.text();
-        if (text.length > MAX_BODY) return json(413, { error: "That is too big to send. A font file can be at most 8 MB." });
-        try { body = text ? JSON.parse(text) : {}; } catch { return json(400, { error: "The request was not valid JSON." }); }
-      }
-      const r = await designSystem.api(request.method, url.pathname, body, user);
-      return json(r.status, r.body);
-    }
-    if (/^\/fonts\//.test(url.pathname)) {
-      let path;
-      try { path = decodeURIComponent(url.pathname.slice(1)); } catch { return new Response("Not found", { status: 404 }); }
-      const bytes = await designSystem.file(path);
-      if (!bytes) return new Response("Not found", { status: 404 });
-      return new Response(bytes, { headers: { "content-type": TYPES[path.split(".").pop()] || "application/octet-stream", "cache-control": "no-store" } });
-    }
-    return env.ASSETS.fetch(request);
+    return handleRequest(request, {
+      identify: (r) => createAccess({ teamDomain: env.TEAM_DOMAIN, aud: env.POLICY_AUD, localDev: env.ACCESS_LOCAL_DEV }).identify(r),
+      designSystem,
+      assets: (r) => env.ASSETS.fetch(r),
+      // The Durable Object holds the WebSockets, and hears who it is from the Worker.
+      live: (r, user) => {
+        const headers = new Headers(r.headers);
+        headers.set("x-console-user", JSON.stringify({ email: user.email, name: user.name || "" }));
+        return designSystem.fetch(new Request(r, { headers }));
+      },
+    });
   },
 };

@@ -1,9 +1,11 @@
-// The console's API, run by the Cloudflare Worker's Durable Object (worker/design-system.mjs).
+// The console's API, put together in server/console.mjs and run by the Cloudflare Worker's Durable Object
+// (worker/design-system.mjs) or the Node server (server/node-server.mjs).
 // Each route gets the request's JSON body. The server around it reads the body, decides who may call,
 // and sends the answer. Errors with a status (like 409 for "no edits to add") go back as they are.
 //
 // store holds the edits (server/store.mjs). proposals turns them into a pull request (server/proposals.mjs).
-// info(): { ai, model, storybook, github }, the parts of the console's state that come from the server's setup.
+// info(): { ai, guide, model, storybook, github }, the parts of the console's state that come from the server's setup.
+//   guide: false turns the design guide off: the page hides it, and /api/ask refuses.
 //   github is { repo, branch }, so the console can say where proposals go.
 // roleOf(user): "viewer", "editor", or "admin". Everyone is an admin for now; later the roles come from Microsoft
 //   Entra ID groups. The browser never decides a role: the server's role replaces any the browser sends.
@@ -18,7 +20,7 @@ export function createApi({ store, proposals, figma, ask, info, roleOf = () => "
     const [draft, published, history, figmaStatus] = await Promise.all([store.draft(), store.published(), proposals.releases(), figma.status()]);
     const i = info();
     const me = user ? { email: user.email, name: user.name || "", role: roleOf(user) } : null;
-    return { draft, draftRev: await store.revOf(draft), preview: i.preview || null, published, engine: { version: ENGINE_VERSION, behind: engineBehind(published.version) }, proposal: prop.proposal, base: prop.base, notice: prop.notice, history, ai: !!i.ai, model: i.ai ? i.model : null, storybook: i.storybook, figma: figmaStatus, github: i.github || null, me };
+    return { draft, draftRev: await store.revOf(draft), preview: i.preview || null, published, engine: { version: ENGINE_VERSION, behind: engineBehind(published.version) }, proposal: prop.proposal, base: prop.base, notice: prop.notice, history, guide: i.guide !== false, ai: i.guide !== false && !!i.ai, model: i.guide !== false && i.ai ? i.model : null, storybook: i.storybook, figma: figmaStatus, github: i.github || null, me };
   }
   const who = (user) => (user ? { email: user.email, name: user.name || "" } : {});
   const by = (user) => (user && (user.name || user.email)) || null;
@@ -40,7 +42,10 @@ export function createApi({ store, proposals, figma, ask, info, roleOf = () => "
     "POST /api/proposal/dismiss": async (b, user) => { await proposals.dismiss(); return state(user); },
     // Makes the edits an earlier version. It reaches apps only when it is added to a proposal and lands.
     "POST /api/rollback": changes("rolled the edits back to an earlier version", async (b, user) => { await store.restore(await proposals.stateOfVersion(String(b.version || ""))); return state(user); }),
-    "POST /api/ask": async (b) => ({ text: await ask(b.turns || []) }),
+    "POST /api/ask": async (b) => {
+      if (info().guide === false) throw Object.assign(new Error("The design guide is turned off here."), { status: 403 });
+      return { text: await ask(b.turns || []) };
+    },
     "GET /api/health": () => ({ ok: true }),
     "POST /api/fonts": (b) => store.saveFont(b),
     "GET /api/figma": () => figma.status(),

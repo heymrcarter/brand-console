@@ -2,13 +2,16 @@
   "name": "brand-console",
   "version": "1.0.0",
   "private": true,
-  "description": "The Brand Console: where the brand team edits the design system (@heymrcarter/design-system), checks it, and publishes. Runs on Cloudflare Workers.",
+  "description": "The Brand Console: where the brand team edits the design system (@heymrcarter/design-system), checks it, and publishes. Runs on Cloudflare Workers, or as a plain Node server on one computer.",
   "type": "module",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "start": "node scripts/start.mjs",
+    "local": "node scripts/local.mjs",
+    "local:sample": "node scripts/local.mjs --sample",
+    "install:artifactory": "node scripts/install-artifactory.mjs",
     "worker:assets": "node scripts/build-worker-assets.mjs",
     "worker:dev": "node scripts/build-worker-assets.mjs && wrangler dev",
     "worker:deploy": "node scripts/deploy-worker.mjs",
@@ -25,7 +28,8 @@
   "dependencies": {
     "@heymrcarter/design-system": "1.8.0",
     "@heymrcarter/design-system-storybook": "1.8.0",
-    "jose": "^6.2.12"
+    "jose": "^6.2.12",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@antfu/skills": "^0.1.0",
