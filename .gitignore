@@ -23,3 +23,5 @@ node_modules
 .dev.vars
 .worker-assets/
 *.private-key.pem
+.agents/
+.claude/
